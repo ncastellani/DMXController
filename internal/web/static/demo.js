@@ -1,6 +1,7 @@
 // Modo demonstração da interface do DMXController (abrir com ?demo=1, ou numa cópia
-// com <html data-demo>). Simula o servidor (PROTOCOLO.md) com dados
-// de exemplo, para desenhar e testar a interface sem o programa rodando.
+// com <html data-demo>). Simula o servidor (README.md, "Protocolo da interface
+// web") com dados de exemplo, para desenhar e testar a interface sem o
+// programa rodando.
 // Não faz parte do show: a página normal nunca carrega este arquivo.
 (function () {
   "use strict";

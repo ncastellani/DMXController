@@ -93,7 +93,7 @@ func run() error {
 	ctl := control.NewController(console, eng, rig)
 	health := &web.Health{}
 	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
-		const msg = "o DMXController está rodando como root (sudo): o som não passa pelo PipeWire do seu usuário e ignora a saída escolhida (sai no HDMI/placa padrão). Rode sem sudo — veja a regra udev no CLAUDE.md."
+		const msg = "o DMXController está rodando como root (sudo): o som não passa pelo PipeWire do seu usuário e ignora a saída escolhida (sai no HDMI/placa padrão). Rode sem sudo — veja a regra udev no README.md."
 		log.Print("ATENÇÃO: " + msg)
 		health.Warn(msg)
 	}

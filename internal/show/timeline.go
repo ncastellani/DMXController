@@ -1,5 +1,5 @@
-// Package show toca a setlist: carrega as timelines (TIMELINE.md), toca
-// o áudio e faz a luz seguir a posição da música.
+// Package show toca a setlist: carrega as timelines (README.md, "Formato da
+// timeline"), toca o áudio e faz a luz seguir a posição da música.
 package show
 
 import (

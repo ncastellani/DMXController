@@ -1,6 +1,7 @@
 // Package analysis analisa uma faixa (BPM, batidas, compassos, energia,
-// partes) e gera a timeline de luz da música (TIMELINE.md), com um LLM
-// opcional via OpenRouter para nomear as partes e escolher os presets.
+// partes) e gera a timeline de luz da música (README.md, "Formato da
+// timeline"), com um LLM opcional via OpenRouter para nomear as partes e
+// escolher os presets.
 //
 // É o porte em Go do antigo scripts/analisar.py (librosa), para o programa
 // rodar no Mac sem Python. Os parâmetros seguem os do librosa.
