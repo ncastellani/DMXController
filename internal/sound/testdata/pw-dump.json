@@ -1,0 +1,87 @@
+[
+ {
+  "id": 42,
+  "type": "PipeWire:Interface:Metadata",
+  "props": {
+   "metadata.name": "default"
+  },
+  "metadata": [
+   {
+    "subject": 0,
+    "key": "default.configured.audio.sink",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "bluez_output.F3_E3_2F_9B_A2_B4.1"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.configured.audio.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_input.usb-BEHRINGER_C-1U-00.analog-stereo"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.audio.sink",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "bluez_output.F3_E3_2F_9B_A2_B4.1"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.audio.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "alsa_input.usb-BEHRINGER_C-1U-00.analog-stereo"
+    }
+   },
+   {
+    "subject": 0,
+    "key": "default.video.source",
+    "type": "Spa:String:JSON",
+    "value": {
+     "name": "v4l2_input.pci-0000_02_00.0-usb-0_7.3_1.0"
+    }
+   }
+  ]
+ },
+ {
+  "id": 63,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "props": {
+    "media.class": "Audio/Sink",
+    "node.name": "alsa_output.pci-0000_08_00.1.hdmi-stereo",
+    "node.description": "GA106 High Definition Audio Controller Digital Stereo (HDMI)",
+    "device.api": "alsa"
+   }
+  }
+ },
+ {
+  "id": 36,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "props": {
+    "media.class": "Audio/Sink",
+    "node.name": "alsa_output.pci-0000_0a_00.4.iec958-stereo",
+    "node.description": "Starship/Matisse HD Audio Controller Digital Stereo (IEC958)",
+    "device.api": "alsa"
+   }
+  }
+ },
+ {
+  "id": 97,
+  "type": "PipeWire:Interface:Node",
+  "info": {
+   "props": {
+    "media.class": "Audio/Sink",
+    "node.name": "bluez_output.F3_E3_2F_9B_A2_B4.1",
+    "node.description": "MONDIAL CM",
+    "device.api": "bluez5"
+   }
+  }
+ }
+]

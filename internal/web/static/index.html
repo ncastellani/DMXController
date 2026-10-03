@@ -1,0 +1,2148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1c1c24">
+<title>Luzes</title>
+<script>
+// Tema salvo neste aparelho (escuro por padrão: a tela fica ao lado do palco, no escuro).
+document.documentElement.dataset.theme = (() => { try { return localStorage.getItem("luzes-tema"); } catch { return null; } })() || "dark"; // escuro por padrão: a tela fica ao lado do palco, no escuro
+</script>
+<style>
+:root, [data-theme="light"] {
+  --desk: #e7e6ee; --bg: #efeef4; --panel: #ffffff; --panel2: #f4f3f8; --panel3: #e6e4ee;
+  --line: #e0dee8; --line2: #cfccda; --text: #15141c; --muted: #5d5b6b; --dim: #8b889a;
+  --accent: #c98a00; --accent2: #6d4dff; --play-bg: #15141c; --play-fg: #ffffff; --sel-bg: #15141c; --sel-fg: #ffffff;
+  --danger: #e0283a; --bo-bg: #ffe9eb; --bo-line: #f08a94; --bo-fg: #b0101f;
+  --ok: #17a35f; --warn-bg: #fff1d6; --warn-line: #e8a33a; --warn-fg: #6b4300;
+  --bulb-off: #d4d2dc; --curve: #15141c; --past: rgba(239,238,244,.6); --cur-bg: #fff4d6;
+  --r: 14px; --R: 22px; color-scheme: light;
+}
+[data-theme="dark"] {
+  --desk: #1c1c24; --bg: #1c1c24; --panel: #282833; --panel2: #31313d; --panel3: #3c3c4a;
+  --line: #363642; --line2: #464655; --text: #f2f1f7; --muted: #b6b4c4; --dim: #8b899e;
+  --accent: #ffcc33; --accent2: #8b74ff; --play-bg: #ffcc33; --play-fg: #1a1300; --sel-bg: #ffcc33; --sel-fg: #1a1300;
+  --danger: #ff3d4f; --bo-bg: #3d1820; --bo-line: #ff3d4f; --bo-fg: #ff8a95;
+  --ok: #3ee08f; --warn-bg: #33220a; --warn-line: #ff9f1c; --warn-fg: #ffdcae;
+  --bulb-off: #4a4a58; --curve: #ffffff; --past: rgba(28,28,36,.55); --cur-bg: #3a3220;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--desk); color: var(--text);
+  font: 15px/1.45 ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; }
+body { padding-bottom: env(safe-area-inset-bottom); }
+a { color: var(--accent); } a:hover { color: var(--text); }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel3); padding: 1px 6px; border-radius: 6px; }
+button { font: inherit; color: inherit; touch-action: manipulation; cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+header, nav, .stage, .tl, .setlist, #console { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+svg { display: block; }
+button svg { pointer-events: none; }
+.lbl, h2 { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- caixa do app ---------- */
+.app { background: var(--bg); min-height: 100vh; max-width: 1560px; margin: 0 auto; }
+
+/* ---------- topo fixo ---------- */
+header { position: sticky; top: 0; z-index: 10; background: var(--bg);
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); }
+header .bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "stage now master"; gap: 8px; }
+header .bar > * { background: var(--panel); border-radius: var(--R); }
+.stage { grid-area: stage; display: flex; gap: 4px; padding: 6px; }
+.lamp { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 78px; padding: 8px 4px 6px;
+  border-radius: 16px; background: var(--panel2); }
+.bulb { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--bulb-off); background: #000; position: relative;
+  transition: background-color .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.bulb .badge { position: absolute; right: -9px; top: -7px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: #000; display: grid; place-items: center; font-size: 12px; box-shadow: 0 0 0 2px var(--panel2); }
+.lamp .name { font-size: 10px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: .08em; line-height: 1.1; }
+.lamp .addr { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; line-height: 1; }
+.lamp.ident .bulb { outline: 2px dashed var(--accent); outline-offset: 4px; }
+
+.now { grid-area: now; display: flex; min-width: 0; }
+.mini { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; padding: 10px 20px 10px 10px; }
+.mini .mp { flex: none; width: 60px; height: 60px; border: 0; border-radius: 18px; background: var(--play-bg); color: var(--play-fg);
+  display: grid; place-items: center; font-size: 22px; }
+.mini .mp:active { transform: scale(.95); }
+.mi { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: baseline; }
+.mi .mt { font-weight: 800; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mi .t { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+.mbar { grid-column: 1 / -1; display: block; height: 6px; background: var(--panel3); border-radius: 99px; overflow: hidden; }
+.mbar b { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; }
+.mini-empty { flex: 1; display: flex; align-items: center; padding: 0 20px; color: var(--dim); font-size: 14px; font-weight: 600; }
+.mini:not([hidden]) + .mini-empty { display: none; }
+
+header .bar > .master { grid-area: master; display: flex; gap: 8px; background: none; }
+.master button { min-height: 80px; min-width: 124px; padding: 8px 18px; border: 2px solid var(--line2); border-radius: var(--R); background: var(--panel);
+  font-weight: 800; font-size: 14px; letter-spacing: .06em; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; line-height: 1.15; text-align: center; }
+.master button:active { transform: scale(.97); background: var(--panel3); }
+.master kbd { display: none; font: 600 10px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); letter-spacing: 0;
+  background: var(--panel3); padding: 2px 7px; border-radius: 99px; }
+@media (hover: hover) and (pointer: fine) { .master kbd { display: block; } }
+.master .bo { background: var(--bo-bg); color: var(--bo-fg); min-width: 176px; font-size: 17px; font-weight: 900; border-color: var(--bo-line); }
+.master .bo:active { background: var(--bo-bg); }
+.master .bo kbd { color: var(--bo-fg); background: rgba(255,61,79,.15); }
+.master .bo.on { background: var(--danger); color: #fff; border-color: var(--danger); box-shadow: 0 0 0 4px rgba(255,61,79,.25); }
+.master .bo.on kbd { display: none; }
+.master .bo.on::after { content: "ligado · toque para voltar"; font-size: 11px; font-weight: 600; letter-spacing: .01em; text-transform: none; }
+
+.healthbar { margin-top: 8px; background: var(--warn-bg); border: 2px solid var(--warn-line); border-radius: 16px; color: var(--warn-fg);
+  padding: 10px 16px; font-size: 14px; font-weight: 700; }
+.healthbar div + div { margin-top: 4px; }
+
+.sub { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-top: 8px; }
+nav { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+nav::-webkit-scrollbar { display: none; }
+.tg { flex: none; display: flex; gap: 4px; padding: 4px; background: var(--panel); border-radius: 99px; }
+nav button { border: 0; background: none; color: var(--muted); min-height: 48px; padding: 0 20px; border-radius: 99px;
+  font-weight: 700; font-size: 15px; white-space: nowrap; transition: background-color .15s ease, color .15s ease; }
+nav button:hover { color: var(--text); }
+nav button.sel { color: var(--sel-fg); background: var(--sel-bg); }
+.tg:first-child button { font-size: 17px; font-weight: 800; padding: 0 24px; }
+.tg.prep button { font-size: 14px; padding: 0 14px; }
+.tg.prep button.sel { background: var(--panel3); color: var(--text); }
+.prep-lbl { align-self: center; padding: 0 6px 0 14px; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.subr { display: flex; align-items: center; gap: 10px; }
+.status { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; }
+.chip { border-radius: 99px; padding: 6px 12px; white-space: nowrap; background: var(--panel); font-weight: 600; }
+.chip b { color: var(--text); font-weight: 800; }
+.chip.warn, .chip.warn b { background: var(--danger); color: #fff; }
+.conn { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); display: inline-block; }
+.conn.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.theme { display: flex; gap: 2px; padding: 4px; background: var(--panel); border-radius: 99px; }
+.theme button { border: 0; background: none; color: var(--muted); min-height: 40px; padding: 0 14px; border-radius: 99px; font-size: 12px; font-weight: 700; }
+.theme button.sel { background: var(--panel3); color: var(--text); }
+
+main { padding: 6px max(16px, env(safe-area-inset-right)) 56px max(16px, env(safe-area-inset-left)); }
+section[hidden] { display: none; }
+h2 { margin: 0 0 12px; }
+h2 small { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--dim); }
+
+/* ---------- show ---------- */
+.showgrid { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .showgrid { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
+  .showgrid > .player { grid-column: 1 / -1; }
+}
+.showgrid > .card { border-radius: var(--R); }
+.player { padding: 22px; }
+.ptop { display: flex; align-items: flex-start; gap: 20px; }
+.ptitle { flex: 1; min-width: 0; }
+.eyebrow { display: inline-block; min-height: 16px; color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.ptitle b { display: block; font-size: 32px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; margin-top: 4px; overflow-wrap: anywhere; }
+.ptitle small { display: block; color: var(--muted); font-size: 14px; margin-top: 6px; font-weight: 500; }
+.ptrans { display: flex; gap: 8px; align-items: stretch; flex: none; }
+.ptrans button { border: 0; border-radius: 20px; width: 68px; height: 76px; font-size: 18px; background: var(--panel3);
+  display: grid; place-items: center; }
+.ptrans .play { width: 104px; font-size: 28px; background: var(--play-bg); color: var(--play-fg); }
+.ptrans button:active:not(:disabled) { transform: scale(.96); }
+.ptrans button:disabled { opacity: .3; cursor: default; }
+.ptime { margin-top: 18px; margin-bottom: 16px; display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.ptime b { font-size: 40px; font-weight: 800; letter-spacing: -.03em; }
+.ptime span { font-size: 15px; color: var(--muted); font-weight: 600; }
+.tl { position: relative; height: 140px; margin: 0; background: var(--panel2); overflow: hidden; cursor: pointer; touch-action: none;
+  border-radius: 18px; }
+.tl .sec { position: absolute; top: 0; bottom: 0; border-right: 2px solid var(--panel); }
+.tl .sec span { position: absolute; left: 8px; top: 8px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--sec-fg, #fff);
+  white-space: nowrap; overflow: hidden; text-overflow: clip; max-width: calc(100% - 10px); }
+[data-theme="light"] .tl .sec span { --sec-fg: #1d1d20; }
+.tl > svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: var(--curve); }
+.tl .cue { position: absolute; bottom: 0; width: 2px; height: 16px; background: var(--curve); opacity: .6; pointer-events: none; border-radius: 2px; }
+.tl .cue.flash { height: auto; top: 26px; width: auto; bottom: auto; transform: translateX(-50%); background: none; opacity: 1;
+  color: var(--accent); font-size: 13px; }
+/* raio = fritação nesse ponto (o SVG não pode herdar o tamanho da curva) */
+.tl .cue.flash svg { display: block; width: 18px; height: 18px; padding: 3px; box-sizing: content-box; border-radius: 50%;
+  background: var(--panel); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.tl .past { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--past); pointer-events: none; }
+.tl .phead { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: var(--text); pointer-events: none; border-radius: 3px; }
+.tl .phead::before { content: ""; position: absolute; top: 4px; left: -4.5px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); }
+.tl .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; font-weight: 600; }
+.pinfo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.kv { padding: 12px 16px; min-width: 0; background: var(--panel2); border-radius: 16px; }
+.kv small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.kv b { display: block; font-size: 16px; font-weight: 800; margin-top: 3px; overflow-wrap: anywhere; }
+#pCue { color: var(--accent); }
+.kv.next b em { font-style: normal; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.psound { display: grid; grid-template-columns: auto 1fr 56px; gap: 4px 14px; align-items: center; margin-top: 16px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.psound output { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); font-weight: 800; }
+.slcard { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.slhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 14px 10px 20px; }
+.slhead h2 { margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slhead h2 .count { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--dim); margin-left: 6px; }
+.setlist { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 12px; }
+.song { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; text-align: left; min-height: 64px;
+  border: 0; background: var(--panel2); border-radius: 16px; padding: 10px 16px; }
+.song:active:not(.bad) { background: var(--panel3); }
+.song .n { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
+.song .title { font-weight: 700; font-size: 15px; min-width: 0; }
+.song small { display: block; color: var(--muted); font-weight: 500; font-size: 13px; }
+.song .d { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; }
+.song.cur { background: var(--cur-bg); box-shadow: inset 0 0 0 2px var(--accent); }
+.song.cur .n { color: var(--accent); }
+.song.cur .title { font-weight: 800; }
+.song.bad { opacity: .5; cursor: default; }
+.song.bad small { color: var(--danger); }
+
+/* ---------- telas menores ---------- */
+@media (max-width: 1100px) {
+  header .bar { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "stage now" "master master"; }
+  .master button { flex: 1; min-width: 0; min-height: 64px; }
+  .master .bo { flex: 1.4; }
+}
+@media (max-width: 700px) {
+  header { padding: max(8px, env(safe-area-inset-top)) 10px 8px; }
+  header .bar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "master" "now"; gap: 6px; }
+  .stage { justify-content: stretch; } .lamp { flex: 1; width: auto; flex-direction: row; gap: 8px; padding: 6px 8px; justify-content: flex-start; }
+  .lamp .bulb { width: 28px; height: 28px; flex: none; }
+  .lamp .addr { display: none; }
+  .master button { min-height: 56px; font-size: 13px; padding: 6px 8px; }
+  .master .bo { font-size: 15px; }
+  .mini { padding: 6px 14px 6px 6px; }
+  .mini .mp { width: 48px; height: 48px; border-radius: 14px; }
+  .subr { width: 100%; justify-content: flex-end; }
+  .status { display: none; }
+  .tg:first-child button { padding: 0 16px; }
+  main { padding: 4px 10px 48px; }
+  .player { padding: 16px; }
+  .ptitle b { font-size: 24px; }
+  .ptrans button { width: 52px; height: 60px; border-radius: 16px; } .ptrans .play { width: 76px; }
+  .pinfo { grid-template-columns: 1fr 1fr; }
+  .kv.next { grid-column: 1 / -1; }
+  .song { padding: 10px 12px; }
+}
+
+/* ---------- console ---------- */
+#console:not([hidden]) { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) { #console:not([hidden]) { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grp.base { grid-column: 1 / -1; } }
+.grp { background: var(--panel); border-radius: var(--R); padding: 20px; }
+.grp h2 { margin-bottom: 16px; }
+.grp h2 { display: flex; align-items: center; gap: 8px; }
+.grp h2::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--accent2); }
+.grp.flash h2::before { background: var(--accent); border-radius: 50%; }
+.grp.strobe h2::before { background: var(--danger); transform: rotate(45deg); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
+.grp.base .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.btn { position: relative; border: 0; border-radius: 16px; min-height: 72px; padding: 10px 12px;
+  text-align: left; font-weight: 800; font-size: 13px; letter-spacing: .02em; cursor: pointer; background: var(--panel2);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.14), inset 0 -3px 0 rgba(0,0,0,.18); overflow: hidden; transition: transform .1s ease; }
+.btn:active { transform: scale(.97); }
+.btn .k { position: absolute; right: 8px; bottom: 6px; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 6px; background: rgba(0,0,0,.22); display: grid; place-items: center; opacity: .9; }
+.btn.on { box-shadow: 0 0 0 3px var(--panel), 0 0 0 6px var(--text); }
+.btn.on::before { content: "● "; }
+.btn.held { transform: scale(.95); box-shadow: 0 0 0 3px var(--panel), 0 0 0 6px var(--accent); }
+.btn.flash { min-height: 88px; }
+.btn.flash::after { content: ""; position: absolute; inset: 5px; border: 2px dashed rgba(255,255,255,.55); border-radius: 12px; pointer-events: none; }
+
+/* ---------- manual ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.card { background: var(--panel); border: 0; border-radius: var(--R); padding: 18px; }
+.card .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; min-height: 48px; }
+.card .sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line2); }
+.card .title { flex: 1; font-weight: 800; font-size: 16px; }
+.card .title small { color: var(--muted); font-weight: 600; }
+.small { border: 0; border-radius: var(--r); min-height: 48px; padding: 8px 16px; background: var(--panel3); cursor: pointer; font-weight: 700; font-size: 14px; }
+.small:active:not(:disabled) { transform: scale(.97); }
+.small:disabled { opacity: .35; cursor: default; }
+.ch { display: grid; grid-template-columns: 104px 1fr 40px; gap: 8px; align-items: center; padding: 2px 0; }
+.ch label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.ch output { font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; font-weight: 700; }
+.ch.manual label, .ch.manual output { color: var(--accent); font-weight: 800; }
+input[type=range] { width: 100%; height: 36px; accent-color: var(--muted); touch-action: none; }
+.ch.manual input[type=range], #pVol, #pLat { accent-color: var(--accent); }
+.hint { color: var(--muted); font-size: 13px; margin: 6px 0 12px; max-width: 80ch; text-wrap: pretty; }
+section > .hint:first-child { background: var(--panel); border-radius: 16px; padding: 12px 16px; margin: 0 0 10px; max-width: none; }
+#releaseAll { margin-top: 2px; }
+
+/* ---------- posições ---------- */
+.pos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.pos .card { text-align: center; padding: 22px 18px; }
+.pos .card .title { text-transform: uppercase; letter-spacing: .08em; font-size: 12px; color: var(--muted); }
+.pos .bulb { margin: 12px auto 12px; width: 88px; height: 88px; border-width: 3px; }
+.pos .addr { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.pos .row { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.pos .row .small { min-width: 56px; min-height: 52px; border-radius: 16px; }
+
+/* ---------- eventos ---------- */
+.log { font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel);
+  border-radius: var(--R); padding: 16px 20px; }
+.log div span { color: var(--accent); margin-right: 10px; }
+
+/* ---------- som ---------- */
+.outs, .devs { display: flex; flex-direction: column; gap: 6px; }
+.opt { display: flex; align-items: center; gap: 12px; text-align: left; border: 0; min-height: 56px;
+  background: var(--panel2); border-radius: 16px; padding: 10px 14px; cursor: pointer; }
+.opt.sel { background: var(--cur-bg); box-shadow: inset 0 0 0 2px var(--accent); }
+.opt .ic { font-size: 18px; width: 24px; text-align: center; }
+.opt .nm { flex: 1; font-weight: 800; }
+.opt small { display: block; color: var(--muted); font-weight: 500; }
+.dev { display: flex; align-items: center; gap: 8px; background: var(--panel2); border-radius: 16px; padding: 8px 8px 8px 14px; }
+.dev .nm { flex: 1; font-weight: 800; }
+.dev .nm small { display: block; color: var(--muted); font-weight: 500; }
+.dev .on { color: var(--ok); }
+.busy { color: var(--accent); font-size: 13px; font-weight: 700; }
+.hint.err { color: var(--danger); }
+/* ---------- editor de timeline ---------- */
+.edcard { padding: 0; display: flex; flex-direction: column; min-width: 0; }
+.edcard .slhead h2 { flex: 1; }
+.edst { font-size: 12px; color: var(--muted); font-weight: 600; }
+.editor { padding: 4px 14px 16px; }
+.editor .edtools { margin-bottom: 8px; }
+.edtools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.edgap { flex: 1; }
+.cues { position: relative; display: flex; flex-direction: column; gap: 4px; max-height: 560px; overflow-y: auto; overscroll-behavior: contain; }
+.editor.ro .cue-row select:disabled, .editor.ro .cue-row .acts .small:disabled { opacity: .45; cursor: default; }
+.editor.ro .cue-row.now .what select:disabled { opacity: .9; }
+.cue-row { flex-shrink: 0; display: grid; grid-template-columns: 76px 74px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px; background: var(--panel2); border-radius: 16px; }
+.cue-row.now { background: var(--cur-bg); box-shadow: inset 0 0 0 2px var(--accent); }
+.cue-row.past { opacity: .42; transition: opacity .2s ease; } /* já foi: mais escuro */
+.cue-row.past:hover, .cue-row.past:focus-within { opacity: .8; }
+.cue-row .t { font-variant-numeric: tabular-nums; font-weight: 800; min-height: 44px; border: 0; border-radius: 12px; background: var(--panel3); }
+.cue-row .ly { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cue-row .ly.flash { color: var(--accent); }
+.cue-row .what { display: flex; gap: 6px; min-width: 0; align-items: center; }
+.cue-row select { min-height: 44px; min-width: 0; flex: 1; font: inherit; font-weight: 700; color: var(--text); background: var(--panel); border: 0; border-radius: 12px; padding: 0 10px; }
+.cue-row select.dur { flex: 0 0 auto; }
+.cue-row .sw { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%; }
+.cue-row .acts { display: flex; gap: 4px; }
+.cue-row .acts .small { min-width: 44px; min-height: 44px; padding: 8px 10px; border-radius: 12px; background: var(--panel); }
+.edsecs { margin-top: 12px; font-size: 13px; }
+.edsecs summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--muted); font-weight: 700; }
+.edsec { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; align-items: center; padding: 3px 0; }
+.edsec input { min-height: 44px; font: inherit; color: var(--text); background: var(--panel2); border: 0; border-radius: 12px; padding: 0 10px; }
+@media (max-width: 700px) {
+  .cue-row { grid-template-columns: 70px minmax(0, 1fr); }
+  .cue-row .what, .cue-row .acts { grid-column: 1 / -1; }
+}
+/* setlist: alça para arrastar */
+.song .n { display: flex; align-items: center; gap: 4px; }
+.song .grip { touch-action: none; cursor: grab; color: var(--dim); font-size: 16px; padding: 10px 4px; margin: -10px 0 -10px -6px; }
+.songwrap.dragging { opacity: .6; }
+.songwrap > .song { width: 100%; }
+/* emenda com a próxima */
+.link { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; margin: 2px 0 0; }
+.linkadd { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 99px; cursor: pointer; }
+.linkadd:hover { color: var(--muted); background: var(--panel2); }
+.link.on { background: var(--panel2); border-radius: 99px; padding: 2px; margin: 4px 24px 0; box-shadow: inset 0 0 0 2px var(--accent); }
+.linklbl { flex: 1; text-align: center; font-size: 13px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.linkbtn { width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--panel); color: var(--text); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.linkbtn:active { transform: scale(.94); }
+.slbtns { display: flex; gap: 6px; flex: 0 0 auto; }
+.slbtns .small { white-space: nowrap; }
+.slbtns .small.icon { min-width: 48px; padding: 0; display: grid; place-items: center; }
+.imports { padding: 12px 20px 16px; border-top: 1px solid var(--line); }
+.aiopt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-height: 44px; font-weight: 600; }
+.aiopt input { width: 20px; height: 20px; accent-color: var(--accent); }
+.aiopt small { color: var(--dim); }
+.job { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.job b { font-weight: 700; overflow-wrap: anywhere; }
+.job .st { color: var(--muted); text-align: right; white-space: nowrap; }
+.job.run .st { color: var(--accent); }
+.job.ok .st { color: var(--ok); }
+.job.bad .st, .job .why.err { color: var(--danger); }
+.job .why { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.job .bar { grid-column: 1 / -1; height: 4px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.job .bar i { display: block; height: 100%; background: var(--accent); }
+#calBtn.on { background: var(--accent); color: #000; }
+.job .tags { color: var(--dim); font-weight: 600; }
+
+/* ---------- músicas: enviar e analisar ---------- */
+.mgrid { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .mgrid { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); } }
+.mgrid .card { border-radius: var(--R); padding: 0; min-width: 0; }
+.mside { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.msongs { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 12px; }
+.msongs .opt { width: 100%; }
+.msongs .opt .nm { min-width: 0; overflow-wrap: anywhere; }
+.msongs .opt .d { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--panel3); color: var(--muted); white-space: nowrap; }
+.tag.warm { background: #5a2410; color: #ffc9a8; } .tag.cold { background: #16305a; color: #b8d4ff; }
+[data-theme="light"] .tag.warm { background: #ffe1d0; color: #8a3200; } [data-theme="light"] .tag.cold { background: #dbe8ff; color: #1d4396; }
+.tag.new { background: var(--warn-bg); color: var(--warn-fg); }
+.mbody { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 18px; }
+.mtarget { font-size: 22px; font-weight: 900; letter-spacing: -.01em; line-height: 1.15; overflow-wrap: anywhere; }
+.mtarget small { display: block; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+.field > .lbl { display: block; margin-bottom: 8px; }
+.field .hint { margin: 8px 0 0; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--panel2); border-radius: 18px; }
+.seg button { border: 0; background: none; min-height: 60px; border-radius: 14px; font-weight: 800; font-size: 14px; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 6px; }
+.seg button.sel { background: var(--sel-bg); color: var(--sel-fg); }
+.seg .dots { display: flex; gap: 3px; } .seg .dots i { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.mbody textarea { display: block; width: 100%; min-height: 200px; resize: vertical; font: inherit; font-size: 16px; line-height: 1.5; color: var(--text);
+  background: var(--panel2); border: 0; border-radius: 14px; padding: 12px 14px; }
+.mbody textarea:disabled { opacity: .45; }
+.mbody textarea::placeholder { color: var(--dim); }
+.mwarn { background: var(--warn-bg); border: 2px solid var(--warn-line); color: var(--warn-fg); border-radius: 14px; padding: 10px 14px; font-size: 13px; font-weight: 700; }
+.mact { display: flex; gap: 8px; }
+.primary { flex: 1; border: 0; border-radius: 16px; min-height: 60px; padding: 8px 20px; background: var(--play-bg); color: var(--play-fg); font-size: 16px; font-weight: 800; }
+.primary:active:not(:disabled) { transform: scale(.98); }
+.primary:disabled { opacity: .35; cursor: default; }
+.drop { width: 100%; border: 2px dashed var(--line2); background: var(--panel2); border-radius: 18px; min-height: 140px; padding: 20px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text); }
+.drop b { font-size: 18px; font-weight: 800; } .drop small { color: var(--muted); font-weight: 600; font-size: 13px; }
+.drop:active { background: var(--panel3); }
+#musicas.over .drop, #musicas.over .mform { box-shadow: inset 0 0 0 3px var(--accent); }
+.mjobs .jobs { padding: 0 20px 14px; }
+.mjobs .jobs > .hint { margin: 0; }
+.msongs { max-height: 560px; overflow-y: auto; overscroll-behavior: contain; }
+
+/* ---------- músicas: prévia 2D e editor da luz ---------- */
+.medit .mebody { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+.medit .editor { padding: 0; }
+.medit .cues { max-height: 520px; }
+.medit { container-type: inline-size; }
+.pvtop { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.3fr) minmax(220px, 1fr); }
+@container (max-width: 640px) { .pvtop { grid-template-columns: minmax(0, 1fr); } }
+/* O palco é sempre escuro (é a vista do show), nos dois temas. */
+.stage2d { position: relative; overflow: hidden; border-radius: 18px; min-height: 120px; display: flex; align-items: center;
+  background: radial-gradient(120% 90% at 50% 0%, #1b1b28 0%, #0a0a10 65%); }
+.stage2d svg { width: 100%; height: auto; }
+.stage2d .truss { fill: #3a3a48; }
+.stage2d .floor { fill: #101016; }
+.stage2d .beam, .stage2d .pool { mix-blend-mode: screen; }
+.stage2d stop { transition: stop-color .15s linear; }
+.stage2d .head { fill: #23232c; stroke: #45455a; stroke-width: 1.5; }
+.stage2d .lens { fill: #15151b; stroke: #45455a; stroke-width: 1.5; transition: fill .15s linear; }
+.stage2d .pvname { fill: #9a98ad; font: 800 10px ui-rounded, -apple-system, system-ui, sans-serif; letter-spacing: .1em; text-anchor: middle; text-transform: uppercase; }
+.stage2d .fx circle { fill: #ffcc33; stroke: #0a0a10; stroke-width: 2; }
+.stage2d .fx path { fill: #1a1300; }
+.stage2d .fx text { fill: #1a1300; font: 900 14px system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; }
+.pvside { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pvtrans { display: flex; align-items: center; gap: 8px; }
+.pvtrans button { border: 0; border-radius: 18px; width: 60px; height: 60px; font-size: 18px; background: var(--panel3); display: grid; place-items: center; }
+.pvtrans .pvplay { width: 84px; font-size: 24px; background: var(--play-bg); color: var(--play-fg); }
+.pvtrans button:active { transform: scale(.96); }
+.pvtime { margin-left: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pvtime b { font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
+.pvtime span { color: var(--muted); font-weight: 600; font-size: 14px; }
+.pvinfo { display: grid; gap: 6px; }
+.pvinfo .kv { padding: 8px 14px; border-radius: 14px; }
+.pvinfo .kv b { font-size: 14px; }
+.pvinfo #pvCue { color: var(--accent); }
+.pvnote { margin: 0; font-size: 12px; color: var(--muted); }
+.pvopts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.pvview { display: flex; gap: 2px; padding: 3px; background: var(--panel2); border-radius: 99px; }
+.pvview button { border: 0; background: none; color: var(--muted); min-height: 40px; padding: 0 14px; border-radius: 99px; font-size: 13px; font-weight: 700; }
+.pvview button.sel { background: var(--panel3); color: var(--text); }
+.stage2d .wall { fill: #0c0c13; }
+.stage2d .yoke { fill: #1c1c24; stroke: #3a3a4a; stroke-width: 1.2; }
+.stage2d .singer { fill: #050508; stroke: #262633; stroke-width: 1.2; }
+.stage2d .singer .mic { fill: none; stroke: #2e2e3c; stroke-width: 2; }
+.stage2d.strobing stop, .stage2d.strobing .lens { transition: none; } /* o pisca é seco */
+.pvnote.warn { color: var(--warn-fg); background: var(--warn-bg); border-radius: 12px; padding: 6px 10px; font-weight: 700; }
+.pvtl { position: relative; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; }
+.pvtl .tl { margin: 0; height: 104px; border-radius: 16px 16px 4px 4px; cursor: inherit; }
+.pvtl canvas { display: block; width: 100%; height: 42px; margin-top: 3px; border-radius: 4px 4px 12px 12px; background: var(--panel2); }
+.pvlabs { position: absolute; left: 6px; bottom: 0; pointer-events: none; }
+.pvtl.haslyr .pvlabs { bottom: 15px; }
+.pvtl .lyr { position: relative; height: 12px; margin-top: 3px; border-radius: 6px; background: var(--panel2); overflow: hidden; }
+.pvtl .lyr i { position: absolute; top: 3px; bottom: 3px; min-width: 2px; border-radius: 3px; background: var(--muted); opacity: .45; }
+.pvtl .lyr i.now { background: var(--sel-bg); opacity: 1; }
+.pvinfo .kv.sing b { font-size: 13px; font-weight: 700; }
+.pvinfo .kv.sing b em { font-style: normal; color: var(--muted); font-weight: 600; }
+.cue-row .what:has(.lyq) { flex-wrap: wrap; row-gap: 2px; }
+.cue-row .what .lyq { flex: 1 1 100%; font-size: 12px; font-weight: 600; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.vpick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vpick .vname { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.vpick .vname.none { color: var(--dim); font-weight: 600; }
+.pvlabs span { position: absolute; left: 0; font-size: 8px; line-height: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: #fff; background: rgba(0,0,0,.55); padding: 0 5px; border-radius: 99px; white-space: nowrap; }
+.pvtl > .past { position: absolute; left: 0; top: 24px; height: 104px; width: 0; background: var(--past); pointer-events: none; border-radius: 16px 0 0 4px; } /* a faixa de cores fica sem véu */
+.pvtl > .phead { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: var(--text); pointer-events: none; border-radius: 3px; }
+.pvtl > .phead::before { content: ""; position: absolute; top: 4px; left: -4.5px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); }
+.pvlegend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -6px 0 0; font-size: 12px; color: var(--muted); }
+.pvlegend > span { white-space: nowrap; }
+@media (max-width: 700px) { .pvlegend > span { white-space: normal; } }
+.pvlegend .hatch { display: inline-block; width: 18px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 2px;
+  background: repeating-linear-gradient(135deg, #c2185b 0 5px, #e88aae 5px 7px); }
+.pvlegend .bolt { color: var(--accent); vertical-align: -2px; }
+.pvlegend svg { display: inline-block; }
+
+/* lista só de leitura (aba Show) */
+.cue-row.ro { grid-template-columns: 76px 74px minmax(0, 1fr) auto; min-height: 44px; }
+.cue-row.ro .go { min-height: 32px; min-width: 64px; padding: 0 12px; border-radius: 10px; background: var(--panel); font-size: 13px; } /* mesma altura do horário */
+.cue-row.ro .t { display: grid; place-items: center; min-height: 32px; font-size: 14px; }
+.cue-row.ro .nm { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cue-row.ro .dur { color: var(--muted); font-weight: 600; white-space: nowrap; }
+@media (max-width: 700px) { .cue-row.ro { grid-template-columns: 64px 64px minmax(0, 1fr) auto; } .cue-row.ro .what { grid-column: auto; } }
+
+/* régua de tempo sobre a barra da música: rótulos em cima, marcas apontando para a barra */
+.ruler { position: relative; height: 22px; margin-bottom: 2px; font: 600 10px/1 ui-rounded, -apple-system, system-ui, sans-serif;
+  color: var(--dim); font-variant-numeric: tabular-nums; cursor: pointer; touch-action: none; }
+.ruler i { position: absolute; bottom: 0; width: 1px; height: 5px; background: var(--line2); }
+.ruler i.major { height: 8px; background: var(--dim); }
+.ruler span { position: absolute; top: 2px; transform: translateX(-50%); white-space: nowrap; }
+.ruler span.first { transform: none; }
+
+#offline { position: fixed; inset: auto 16px 16px 16px; background: var(--danger); color: #fff;
+  padding: 14px 18px; border-radius: 18px; font-weight: 700; text-align: center; z-index: 20; }
+body.off main, body.off .master { opacity: .4; pointer-events: none; }
+</style>
+</head>
+<body class="off">
+<div class="app">
+<header>
+  <div class="bar">
+    <div class="stage" id="stage" title="Palco, vista da plateia"></div>
+    <div class="now" id="miniSlot"><div class="mini-empty">Nenhuma música carregada</div></div>
+    <div class="master">
+      <button id="stopAll" title="Esc">PARAR TUDO<kbd>Esc</kbd></button>
+      <button class="bo" id="blackout" title="Espaço">BLACKOUT<kbd>Espaço</kbd></button>
+    </div>
+  </div>
+  <div class="healthbar" id="health" hidden></div>
+  <div class="sub">
+    <nav id="tabs">
+      <div class="tg">
+        <button data-tab="show" class="sel">Show</button>
+        <button data-tab="console">Console</button>
+      </div>
+      <div class="tg prep">
+        <span class="prep-lbl">Preparação</span>
+        <button data-tab="musicas">Músicas</button>
+        <button data-tab="manual">Manual</button>
+        <button data-tab="palco">Posições</button>
+        <button data-tab="som">Som</button>
+        <button data-tab="log">Eventos</button>
+      </div>
+    </nav>
+    <div class="subr">
+      <div class="status" id="status"></div>
+      <div class="theme" id="themeSw" role="group" aria-label="Tema"><button data-set="light">Claro</button><button data-set="dark">Escuro</button></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="show">
+    <div class="showgrid">
+      <div class="card player">
+        <div class="ptop">
+          <div class="ptitle"><span class="eyebrow" id="pState"></span><b id="pTitle">Nenhuma música carregada</b><small id="pMeta">Escolha uma música da setlist.</small></div>
+          <div class="ptrans">
+            <button id="pStop" title="Parar e voltar ao início" aria-label="Parar" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></button>
+            <button class="play" id="pPlay" title="Tocar / pausar" aria-label="Tocar / pausar" disabled><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+          </div>
+        </div>
+        <div class="ptime"><b id="pTime">0:00</b><span id="pDur"></span></div>
+        <div class="ruler" id="tlRuler" aria-hidden="true"></div>
+        <div class="tl" id="tl"><div class="empty">Sem timeline</div></div>
+        <div class="pinfo" id="pInfo">
+          <div class="kv"><small>Parte</small><b id="pSec">—</b></div>
+          <div class="kv"><small>Luz agora</small><b id="pCue">—</b></div>
+          <div class="kv next"><small>Próxima luz</small><b id="pNext">—</b></div>
+        </div>
+        <div class="psound" id="pSound">
+          <label for="pVol">Volume</label><input type="range" id="pVol" min="0" max="100"><output id="pVolV"></output>
+        </div>
+        <p class="hint" id="pNoAudio" hidden>Sem saída de som: a luz segue um relógio interno.</p>
+      </div>
+      <div class="card slcard">
+        <div class="slhead"><h2 id="slTitle">Setlist <span class="count" id="slCount"></span></h2><span class="slbtns"><button class="small" id="slAdd" title="Enviar músicas .wav ou analisar de novo (aba Músicas)">+ Adicionar</button><button class="small icon" id="slScan" title="Reler a pasta de músicas" aria-label="Recarregar a pasta de músicas"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></span></div>
+        <div class="setlist" id="setlist"></div>
+        <div class="imports" id="imports" hidden>
+          <div id="jobList"></div>
+        </div>
+      </div>
+      <div class="card edcard">
+        <div class="slhead"><h2>Luz da música</h2><span class="edst" id="edStatus"></span><button class="small" id="edOpen" disabled title="Editar a luz desta música na aba Músicas, com a prévia dos canhões">Editar</button></div>
+        <div class="editor ro">
+          <div class="cues" id="edCues"><p class="hint">Carregue uma música para ver as trocas de luz.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="console" hidden></section>
+
+  <section id="musicas" hidden>
+    <div class="mgrid">
+      <div class="mside">
+      <div class="card mlist">
+        <div class="slhead"><h2>Músicas <span class="count" id="mCount"></span></h2><span class="slbtns"><button class="small" id="mPick" title="Enviar arquivos .wav">+ Enviar .wav</button></span></div>
+        <div class="msongs" id="mSongs"></div>
+        <input type="file" id="mFile" accept=".wav,audio/wav,audio/x-wav,audio/wave" multiple hidden>
+      </div>
+      <div class="card mjobs">
+        <div class="slhead"><h2>Fila de análise</h2></div>
+        <div class="jobs" id="mJobs"></div>
+      </div>
+      </div>
+      <div class="mside">
+      <div class="card medit" id="mEdit" hidden>
+        <div class="slhead"><h2>Luz da música</h2><span class="edst" id="meStatus"></span><button class="small" id="meAnalyze" title="Gerar a luz de novo (outra temperatura de cores, versão cantada, IA)">Analisar de novo…</button></div>
+        <div class="mebody">
+          <div class="mtarget" id="meTitle"></div>
+          <p class="mwarn" id="meErr" hidden></p>
+          <div class="pvtop">
+            <div class="stage2d" id="pvStage" title="Prévia: a luz calculada para cada canhão, vista da plateia"></div>
+            <div class="pvside">
+              <div class="pvtrans">
+                <button class="pvplay" id="pvPlay" title="Ouvir a prévia neste aparelho" aria-label="Tocar / pausar a prévia"></button>
+                <button class="pvstop" id="pvStop" title="Voltar ao início" aria-label="Voltar ao início"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></button>
+                <div class="pvtime"><b id="pvTime">0:00</b> <span id="pvDur"></span></div>
+              </div>
+              <div class="pvinfo">
+                <div class="kv"><small>Parte</small><b id="pvSec">—</b></div>
+                <div class="kv"><small>Luz aqui</small><b id="pvCue">—</b></div>
+                <div class="kv next"><small>Próxima</small><b id="pvNext">—</b></div>
+                <div class="kv sing" id="pvSingKv" hidden><small>Cantando</small><b id="pvSing">—</b></div>
+              </div>
+              <p class="pvnote" id="pvNote">Prévia: o som sai <b>neste aparelho</b> e os canhões não acendem.</p>
+              <div class="pvopts">
+                <div class="pvview" id="pvView" role="group" aria-label="Vista do palco"><button data-view="trelica" title="Canhões pendurados, fachos para baixo">Pendurados</button><button data-view="chao" title="Como no show: canhões no chão, os das pontas cruzando e o do meio para a plateia">No chão</button></div>
+                <label class="aiopt" title="Pisca no máximo 3 vezes por segundo (limite para fotossensibilidade)"><input type="checkbox" id="pvFlash"> Piscar strobo e fritação</label>
+                <label class="aiopt" id="pvVoiceRow" title="Ouvir a versão cantada no lugar do playback, para conferir as cores na palavra (no show toca só o playback)" hidden><input type="checkbox" id="pvVoice"> Ouvir com voz</label>
+              </div>
+            </div>
+          </div>
+          <div class="pvtl" id="pvTl">
+            <div class="ruler" id="meRuler" aria-hidden="true"></div>
+            <div class="tl" id="meTl"></div>
+            <canvas id="pvStrip" aria-label="Faixa de cores: a luz de cada canhão ao longo da música"></canvas>
+            <div class="lyr" id="pvLyr" hidden></div>
+            <div class="pvlabs" id="pvLabs"></div>
+            <div class="past" id="pvPast"></div><div class="phead" id="pvHead"></div>
+          </div>
+          <p class="pvlegend"><span><i class="hatch"></i> listrado = strobo ou troca rápida de cor</span><span><span class="bolt"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 14h6.5l-1 8L19 10h-6.5z"/></svg></span> = fritação</span></p>
+          <div class="editor">
+            <div class="edtools">
+              <button class="small" data-add="base" title="Nova troca de luz no ponto atual da prévia">+ Luz aqui</button>
+              <button class="small" data-add="flash" title="Nova fritação no ponto atual da prévia">+ Fritação aqui</button>
+              <button class="small" data-add="blackout" title="Apagar a luz no ponto atual da prévia">+ Apagar aqui</button>
+              <span class="edgap"></span>
+              <button class="small" id="edUndo" disabled>Desfazer</button>
+              <button class="small" id="edRevert" disabled title="Voltar à timeline gerada pela análise">Restaurar gerada</button>
+            </div>
+            <p class="hint">“Aqui” (ou o horário) leva a prévia até aquela troca. “Selecionar” move a troca para o ponto atual da prévia, encaixada na batida. As mudanças são salvas sozinhas e, se a música estiver no show, valem na hora.</p>
+            <div class="cues" id="meCues"></div>
+            <input type="color" id="edColor" tabindex="-1" aria-hidden="true" style="position:fixed;left:50%;top:40%;width:1px;height:1px;opacity:0;pointer-events:none">
+            <details class="edsecs"><summary>Nomes das partes</summary><div id="edSecs"></div></details>
+          </div>
+        </div>
+      </div>
+      <div class="card mform">
+        <div class="slhead"><h2 id="mHead">Analisar</h2><button class="small" id="mCancel" hidden>Cancelar</button></div>
+        <div class="mbody" id="mEmpty">
+          <button class="drop" id="mDrop"><b>+ Enviar músicas novas</b><small>Arquivos .wav — toque para escolher ou arraste para cá</small></button>
+          <p class="hint" style="margin:0">Ou escolha uma música da lista para gerar a luz de novo — com outra temperatura de cores ou com a versão cantada.</p>
+        </div>
+        <div class="mbody" id="mBody" hidden>
+          <div class="mtarget" id="mTarget"></div>
+          <div class="field">
+            <span class="lbl">Cores</span>
+            <div class="seg" id="mTemp" role="group" aria-label="Temperatura das cores">
+              <button data-temp="auto"><span class="dots"><i style="background:#ff3c00"></i><i style="background:#ff0a2d"></i><i style="background:#0064ff"></i></span>Automático</button>
+              <button data-temp="quente"><span class="dots"><i style="background:#ff0000"></i><i style="background:#ff3700"></i><i style="background:#ff6400"></i></span>Quentes</button>
+              <button data-temp="fria"><span class="dots"><i style="background:#0000ff"></i><i style="background:#00ffff"></i><i style="background:#7800ff"></i></span>Frias</button>
+            </div>
+            <p class="hint" id="mTempHint"></p>
+          </div>
+          <label class="aiopt" id="mAIrow"><input type="checkbox" id="mAI" checked> Usar IA (ouve a música e escolhe a luz de cada parte)</label>
+          <div class="field" id="mVoiceField">
+            <span class="lbl">Versão cantada <small>(opcional)</small></span>
+            <div class="vpick">
+              <button class="small" id="mVoicePick">Escolher .wav…</button>
+              <span class="vname" id="mVoiceName"></span>
+              <button class="small" id="mVoiceDrop" hidden>Tirar</button>
+            </div>
+            <input type="file" id="mVoiceFile" accept=".wav,audio/wav,audio/x-wav,audio/wave" hidden>
+            <p class="hint" id="mVoiceHint"></p>
+          </div>
+          <div class="field">
+            <label class="lbl" for="mLyrics">Letra <small>(opcional)</small></label>
+            <textarea id="mLyrics" placeholder="Cole aqui a letra da música (do letras.mus.br, por exemplo)…" spellcheck="false"></textarea>
+            <p class="hint" id="mLyricsHint"></p>
+          </div>
+          <div class="mwarn" id="mWarn" hidden></div>
+          <div class="mact"><button class="primary" id="mGo">Analisar</button></div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="manual" hidden>
+    <p class="hint">Mexer num canal o fixa por cima do que estiver tocando (fica amarelo). “Soltar” devolve o canal para os presets. Canal 6 = 50 com canal 7 alto liga o strobo do canhão — os tetos de segurança não valem aqui.</p>
+    <div class="cards" id="manualCards"></div>
+    <p><button class="small" id="releaseAll">Soltar todos os canais</button></p>
+  </section>
+
+  <section id="palco" hidden>
+    <p class="hint">Ordem do palco, da esquerda para a direita, vista da plateia. Use as setas para trocar canhões de lugar: os presets passam a ir para o canhão que está fisicamente naquela posição. “Identificar” acende só aquele canhão em branco por 3 s. A troca fica salva em <code>config/patch.yaml</code>.</p>
+    <div class="pos" id="posCards"></div>
+  </section>
+
+  <section id="som" hidden>
+    <p class="hint" id="sndMissing" hidden></p>
+    <div class="cards">
+      <div class="card">
+        <div class="head"><div class="title">Saída de som</div><span class="busy" id="sndBusy"></span></div>
+        <div class="outs" id="sndOuts"></div>
+        <p class="hint">Escolha por onde a música sai: caixa Bluetooth, cabo P2 (fone) ou alto-falante do computador.</p>
+      </div>
+      <div class="card">
+        <div class="head"><div class="title">Caixa Bluetooth</div><button class="small" id="btScan">Procurar caixas</button></div>
+        <div class="devs" id="btDevs"></div>
+        <p class="hint">Para parear, coloque a caixa em modo de pareamento e toque em “Procurar caixas”. A caixa conectada pela última vez é reconectada sozinha se cair.</p>
+        <p class="hint err" id="sndErr" hidden></p>
+      </div>
+      <div class="card">
+        <div class="head"><div class="title">Atraso da saída</div></div>
+        <div class="psound">
+          <label for="pLat">Atraso</label><input type="range" id="pLat" min="0" max="600" step="5"><output id="pLatV"></output>
+        </div>
+        <p class="hint">O som leva um tempo para sair na caixa (Bluetooth: ~150–300 ms). Na calibração, os canhões piscam em branco a cada clique: aumente o atraso até a piscada cair junto com o clique que você ouve.</p>
+        <p><button class="small" id="calBtn">Calibrar</button></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="log" hidden>
+    <div class="log" id="logList"></div>
+  </section>
+</main>
+
+</div>
+<div id="offline">Sem conexão com o luzes — reconectando…<br><small>Confira se o programa está rodando no computador e se este aparelho está na mesma rede.</small></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const ROLE = { dimmer: "Dimmer", red: "Vermelho", green: "Verde", blue: "Azul", white: "Branco",
+  mode: "Função", speed: "Velocidade", empty: "(vazio)" };
+const svgI = (d) => `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">${d}</svg>`;
+const ICON = { play: svgI('<path d="M7 4.5v15l13-7.5z"/>'), pause: svgI('<path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/>'),
+  bolt: svgI('<path d="M13.5 2 4 14h6.5l-1 8L19 10h-6.5z"/>') };
+
+let ws = null, config = null, state = null, retry = 500;
+const buttons = new Map();   // id → elemento
+const flashIds = new Set();  // ids de botões de flash
+const keyMap = new Map();    // tecla → {id, flash}
+const held = new Set();      // flashes segurados por este navegador
+const dragging = new Set();  // sliders sendo arrastados ("pos:ch")
+let pingTimer = null;
+
+// Devolve se a mensagem saiu (sem conexão, ela se perde).
+function send(m) { if (!ws || ws.readyState !== 1) return false; ws.send(JSON.stringify(m)); return true; }
+
+// Modo demonstração (?demo=1 ou <html data-demo>): demo.js simula o servidor
+// com dados de exemplo. Só para desenhar/testar a interface, nunca no show.
+const DEMO = new URLSearchParams(location.search).has("demo") || "demo" in document.documentElement.dataset;
+if (DEMO) {
+  const tag = document.createElement("div");
+  tag.textContent = "MODO DEMONSTRAÇÃO — dados de exemplo";
+  tag.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:30;background:#7f5af0;color:#fff;font:700 11px system-ui;padding:4px 8px;border-radius:99px;pointer-events:none";
+  document.body.append(tag);
+}
+
+function connect() {
+  if (DEMO && !window.LuzesDemoSocket) {
+    const sc = document.createElement("script");
+    sc.src = "demo.js"; sc.onload = connect;
+    document.head.append(sc);
+    return;
+  }
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = DEMO ? new window.LuzesDemoSocket() : new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => {
+    retry = 500; document.body.classList.remove("off"); $("#offline").hidden = true;
+    if (ed.file && !ed.saved) edSave(); // edição feita sem conexão
+  };
+  ws.onclose = () => {
+    document.body.classList.add("off"); $("#offline").hidden = false;
+    held.clear(); syncHeld();
+    setTimeout(connect, retry); retry = Math.min(retry * 2, 5000);
+  };
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === "config") { config = m; buildConsole(); }
+    else if (m.type === "state") { const first = !state || state.positions.length !== m.positions.length; state = m; if (first) buildPositions(); render(); }
+    else if (m.type === "event") addEvent(m);
+    else if (m.type === "events") { $("#logList").innerHTML = ""; (m.items || []).forEach(addEvent); }
+    else if (m.type === "setlist") { setlist = m; renderSetlist(); renderMusicas(); }
+    else if (m.type === "timeline") { timeline = m.timeline; edEdited = !!m.edited; renderTimeline(); renderShowCues(); }
+    else if (m.type === "songTimeline") onSongTimeline(m);
+    else if (m.type === "player") { player = m; playerAt = performance.now(); renderPlayer(); }
+    else if (m.type === "sound") { sound = m; renderSound(); renderHealth(); }
+    else if (m.type === "jobs") { jobs = m; renderJobs(); renderMForm(); }
+  };
+}
+
+// ---------- console ----------
+function textColor(hex) {
+  if (!hex) return "#fff";
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#000" : "#fff";
+}
+
+function buildConsole() {
+  const root = $("#console");
+  root.innerHTML = ""; buttons.clear(); flashIds.clear(); keyMap.clear();
+  for (const g of config.groups) {
+    const h = document.createElement("h2");
+    const tip = g.layer === "flash" ? ` <small>— segure (máx. ${config.flashLimit} s)</small>`
+      : g.layer === "strobe" ? ` <small>— liga/desliga (máx. ${config.strobeLimit} s)</small>` : "";
+    h.innerHTML = g.name + tip;
+    const grid = document.createElement("div"); grid.className = "grid";
+    for (const b of g.buttons) {
+      const el = document.createElement("button");
+      el.className = "btn" + (g.layer === "flash" ? " flash" : "");
+      el.style.background = b.color || "";
+      el.style.color = textColor(b.color);
+      el.textContent = b.caption;
+      if (b.key) { const k = document.createElement("span"); k.className = "k"; k.textContent = b.key.toUpperCase(); el.append(k); }
+      if (g.layer === "flash") { flashIds.add(b.id); bindHold(el, b.id); }
+      else el.addEventListener("click", () => send({ type: "press", id: b.id }));
+      if (b.key) keyMap.set(b.key, { id: b.id, flash: g.layer === "flash" });
+      buttons.set(b.id, el); grid.append(el);
+    }
+    const box = document.createElement("div"); box.className = "grp " + (g.layer || ""); // um bloco por grupo
+    box.append(h, grid); root.append(box);
+  }
+}
+
+function bindHold(el, id) {
+  const up = () => { if (held.delete(id)) { send({ type: "flash", id, down: false }); syncHeld(); } };
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); el.setPointerCapture(e.pointerId);
+    if (!held.has(id)) { held.add(id); send({ type: "flash", id, down: true }); syncHeld(); }
+  });
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+  el.addEventListener("lostpointercapture", up);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+// Enquanto houver flash segurado, avisa o servidor que continua segurando.
+function syncHeld() {
+  for (const [id, el] of buttons) el.classList.toggle("held", held.has(id));
+  if (held.size && !pingTimer) pingTimer = setInterval(() => send({ type: "ping" }), 250);
+  if (!held.size && pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+}
+function releaseAll() {
+  for (const id of held) send({ type: "flash", id, down: false });
+  held.clear(); syncHeld();
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+window.addEventListener("blur", releaseAll);
+
+// Atalhos no computador (no navegador dá para saber quando a tecla é solta).
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " ") { e.preventDefault(); if (!e.repeat) send({ type: "blackout" }); return; }
+  if (e.key === "Escape") { send({ type: "stopAll" }); return; }
+  if (k === "b") { send({ type: "stopStrobe" }); return; }
+  const m = keyMap.get(k);
+  if (!m || e.repeat) return;
+  if (m.flash) { if (!held.has(m.id)) { held.add(m.id); send({ type: "flash", id: m.id, down: true }); syncHeld(); } }
+  else send({ type: "press", id: m.id });
+});
+document.addEventListener("keyup", (e) => {
+  const m = keyMap.get(e.key.toLowerCase());
+  if (m && m.flash && held.delete(m.id)) { send({ type: "flash", id: m.id, down: false }); syncHeld(); }
+});
+
+$("#blackout").onclick = () => send({ type: "blackout" });
+$("#stopAll").onclick = () => send({ type: "stopAll" });
+$("#releaseAll").onclick = () => send({ type: "release", pos: -1 });
+
+// ---------- palco, manual e posições ----------
+function lamp() {
+  const d = document.createElement("div"); d.className = "lamp";
+  d.innerHTML = `<div class="bulb"><span class="badge" hidden title="strobo">${ICON.bolt}</span></div><div class="name"></div><div class="addr"></div>`;
+  return d;
+}
+
+function buildPositions() {
+  const stage = $("#stage"); stage.innerHTML = "";
+  const cards = $("#manualCards"); cards.innerHTML = "";
+  const pos = $("#posCards"); pos.innerHTML = "";
+  state.positions.forEach((p, i) => {
+    stage.append(lamp());
+
+    const card = document.createElement("div"); card.className = "card";
+    card.innerHTML = `<div class="head"><div class="sw"></div><div class="title"></div><button class="small">Soltar</button></div>`;
+    card.querySelector("button").onclick = () => send({ type: "release", pos: i });
+    p.channels.forEach((c, ch) => {
+      const row = document.createElement("div"); row.className = "ch";
+      row.innerHTML = `<label>${ch + 1} · ${ROLE[c.role] || c.role}</label><input type="range" min="0" max="255" step="1"><output></output>`;
+      const input = row.querySelector("input"), key = `${i}:${ch}`;
+      let pending = null;
+      input.addEventListener("pointerdown", () => dragging.add(key));
+      const stop = () => dragging.delete(key);
+      input.addEventListener("pointerup", stop); input.addEventListener("pointercancel", stop);
+      input.addEventListener("change", stop);
+      input.addEventListener("input", () => {
+        row.querySelector("output").textContent = input.value;
+        if (pending === null) requestAnimationFrame(() => { send({ type: "manual", pos: i, ch, value: +pending }); pending = null; });
+        pending = input.value;
+      });
+      card.append(row);
+    });
+    cards.append(card);
+
+    const pc = document.createElement("div"); pc.className = "card";
+    pc.innerHTML = `<div class="title"></div><div class="bulb"></div><div class="addr"></div>
+      <div class="row"><button class="small" data-d="-1">◀</button><button class="small id">Identificar</button><button class="small" data-d="1">▶</button></div>`;
+    pc.querySelector('[data-d="-1"]').onclick = () => send({ type: "swap", a: i, b: i - 1 });
+    pc.querySelector('[data-d="1"]').onclick = () => send({ type: "swap", a: i, b: i + 1 });
+    pc.querySelector(".id").onclick = () => send({ type: "identify", pos: i });
+    pos.append(pc);
+  });
+}
+
+function paintBulb(el, p) {
+  const n = parseInt(p.color.slice(1), 16), lit = n !== 0;
+  el.style.background = p.color;
+  el.style.boxShadow = lit ? `0 0 14px 1px ${p.color}88` : "none";
+  el.style.borderColor = lit ? p.color : "";
+  const badge = el.querySelector(".badge"); if (badge) badge.hidden = !p.strobe;
+}
+
+function renderHealth() {
+  const h = (state && state.health) || {}, warns = [];
+  if (h.dmx === false) warns.push(`⚠ Interface DMX desconectada — os canhões não estão recebendo sinal. ${h.dmxError || ""} (tentando de novo a cada 1 s)`);
+  if (h.audio === false) warns.push(`⚠ Sem saída de som: ${h.audioError || ""}`);
+  if (sound && sound.warning) warns.push(`⚠ ${sound.warning}`);
+  for (const w of h.warnings || []) warns.push(`⚠ ${w}`);
+  const hb = $("#health"); hb.hidden = !warns.length;
+  hb.replaceChildren(...warns.map((w) => { const d = document.createElement("div"); d.textContent = w; return d; }));
+}
+
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function render() {
+  if (!state) return;
+  const st = state;
+  $("#blackout").classList.toggle("on", st.blackout);
+  for (const [id, el] of buttons) {
+    el.classList.toggle("on", !flashIds.has(id) && (st.active.base === id || st.active.strobe === id));
+  }
+
+  const lamps = $("#stage").children, cards = $("#manualCards").children, pcs = $("#posCards").children;
+  st.positions.forEach((p, i) => {
+    const l = lamps[i];
+    paintBulb(l.querySelector(".bulb"), p);
+    l.querySelector(".name").textContent = p.name;
+    l.querySelector(".addr").textContent = "d" + String(p.address).padStart(3, "0");
+    l.classList.toggle("ident", st.identify === i);
+
+    const c = cards[i];
+    c.querySelector(".sw").style.background = p.color;
+    c.querySelector(".title").innerHTML = `${p.name} <small>d${String(p.address).padStart(3, "0")}</small>`;
+    c.querySelector("button").disabled = !p.channels.some((x) => x.manual);
+    c.querySelectorAll(".ch").forEach((row, ch) => {
+      const v = p.channels[ch];
+      row.classList.toggle("manual", v.manual);
+      if (!dragging.has(`${i}:${ch}`)) {
+        row.querySelector("input").value = v.value;
+        row.querySelector("output").textContent = v.value;
+      }
+    });
+
+    const pc = pcs[i];
+    pc.querySelector(".title").textContent = p.name;
+    pc.querySelector(".addr").textContent = "d" + String(p.address).padStart(3, "0");
+    paintBulb(pc.querySelector(".bulb"), p);
+    pc.querySelector('[data-d="-1"]').disabled = i === 0;
+    pc.querySelector('[data-d="1"]').disabled = i === st.positions.length - 1;
+  });
+
+  // Status
+  const name = (id) => { const el = buttons.get(id); return el ? el.firstChild.textContent : ""; };
+  const chips = [`<span class="conn on"></span>`];
+  renderHealth();
+  if (st.blackout) chips.push(`<span class="chip warn"><b>BLACKOUT</b></span>`);
+  if (st.show) chips.push(`<span class="chip">♪ show: <b>${esc(st.show)}</b></span>`);
+  for (const [layer, label] of [["base", "base"], ["strobe", "strobe"], ["flash", "fritação"]]) {
+    if (st.active[layer] >= 0) chips.push(`<span class="chip">${label}: <b>${esc(name(st.active[layer]))}</b></span>`);
+  }
+  if (st.positions.some((p) => p.channels.some((c) => c.manual))) chips.push(`<span class="chip warn">canais manuais ativos</span>`);
+  if (chips.length === 1) chips.push(`<span class="chip">nada tocando</span>`);
+  $("#status").innerHTML = chips.join("");
+}
+
+// ---------- show: setlist, timeline e player ----------
+let setlist = null, timeline = null, player = null, playerAt = 0;
+const mmss = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
+
+function renderSetlist() {
+  const n = setlist.songs.length;
+  $("#slCount").textContent = n ? `· ${n} ${n === 1 ? "música" : "músicas"}` : "";
+  $("#slTitle").title = `Pasta: ${setlist.dir}`;
+  const list = $("#setlist"); list.innerHTML = "";
+  if (!setlist.songs.length) { list.innerHTML = `<p class="hint">Nenhuma música ainda. Toque em “Adicionar” e envie os arquivos .wav: a timeline de luz é gerada sozinha.</p>`; return; }
+  setlist.songs.forEach((so, i) => {
+    const wrap = document.createElement("div"); wrap.className = "songwrap"; wrap.dataset.file = so.file;
+    const b = document.createElement("button");
+    b.className = "song" + (so.error ? " bad" : "");
+    b.dataset.index = so.index;
+    const meta = so.error || [so.genre, so.mood].filter(Boolean).join(" · ");
+    b.innerHTML = `<span class="n"><span class="grip" title="Arraste para mudar a ordem" aria-label="Arrastar">⠿</span>${so.index + 1}</span><span class="title"></span><span class="d">${mmss(so.duration)}</span>`;
+    const title = b.querySelector(".title"); title.textContent = so.title;
+    if (meta) { const sm = document.createElement("small"); sm.textContent = meta; title.append(sm); }
+    if (!so.error) b.onclick = (e) => {
+      if (e.target.closest(".grip") || dragEnded) return;
+      if (player && player.playing && player.current !== so.index && !confirm(`Trocar para “${so.title}”? A música atual vai parar.`)) return;
+      send({ type: "load", id: so.index });
+    };
+    wrap.append(b);
+    if (i < n - 1) wrap.append(linkControl(so));
+    list.append(wrap);
+  });
+  markCurrent();
+}
+
+// Emenda com a próxima: desligada, um convite discreto; ligada, o intervalo
+// com − / + (passos de 0,25 s) e ✕. O intervalo pode ser 0 (sem nenhum corte).
+const linkTimers = new Map();
+function linkControl(so) {
+  const d = document.createElement("div"); d.className = "link" + (so.link ? " on" : "");
+  if (!so.link) {
+    const b = document.createElement("button"); b.className = "linkadd"; b.textContent = "⤓ emendar com a próxima";
+    b.title = "Ao terminar, começar a próxima música sem parar";
+    b.onclick = () => send({ type: "link", str: so.file, down: true, t: 0 });
+    d.append(b);
+    return d;
+  }
+  let gap = so.gap || 0;
+  const label = document.createElement("span"); label.className = "linklbl";
+  const show = () => { label.textContent = `⛓ emenda · ${gap.toFixed(2).replace(".", ",")} s`; };
+  const step = (delta) => {
+    gap = Math.min(30, Math.max(0, Math.round((gap + delta) * 4) / 4)); show();
+    clearTimeout(linkTimers.get(so.file));
+    linkTimers.set(so.file, setTimeout(() => send({ type: "link", str: so.file, down: true, t: gap }), 400));
+  };
+  const btn = (txt, title, fn) => { const b = document.createElement("button"); b.className = "linkbtn"; b.textContent = txt; b.title = title; b.onclick = fn; return b; };
+  show();
+  d.append(btn("−", "Menos intervalo", () => step(-0.25)), label, btn("+", "Mais intervalo", () => step(0.25)),
+    btn("✕", "Não emendar (parar ao terminar)", () => send({ type: "link", str: so.file, down: false })));
+  return d;
+}
+function markCurrent() {
+  for (const b of $("#setlist").querySelectorAll(".song")) b.classList.toggle("cur", !!player && +b.dataset.index === player.current);
+}
+
+// Cor da parte pela energia: azul escuro (calma) → magenta → laranja (forte).
+function energyColor(e) {
+  const hue = 250 - 230 * Math.min(1, Math.max(0, e));
+  e = Math.min(1, Math.max(0, e));
+  return document.documentElement.dataset.theme === "dark"
+    ? `hsl(${(hue + 360) % 360} 42% ${16 + 16 * e}%)`
+    : `hsl(${(hue + 360) % 360} ${45 + 25 * e}% ${86 - 22 * e}%)`;
+}
+
+function renderTimeline() { drawTimeline($("#tl"), timeline, "tl"); drawRuler($("#tlRuler"), songDur(timeline)); }
+
+// Régua de tempo (em cima da barra): marcas com o minuto:segundo, com o passo escolhido pela
+// largura (rótulos a pelo menos ~56 px um do outro) e marcas menores entre eles.
+const RULER_STEPS = [[5, 1], [10, 2], [15, 5], [30, 10], [60, 15], [120, 30], [300, 60]];
+function drawRuler(el, dur) {
+  el.dataset.dur = dur || 0;
+  el.innerHTML = "";
+  const w = el.clientWidth;
+  if (!dur || !w) return;
+  const [step, minor] = RULER_STEPS.find(([st]) => (st / dur) * w >= 56) || RULER_STEPS[RULER_STEPS.length - 1];
+  const pct = (t) => `${(100 * t / dur).toFixed(3)}%`;
+  let html = "";
+  for (let t = 0; t <= dur + 1e-6; t += minor) {
+    const major = Math.round(t) % step === 0;
+    html += `<i${major ? ' class="major"' : ""} style="left:${pct(t)}"></i>`;
+    if (major && (t / dur) * w <= w - 18) html += `<span${t === 0 ? ' class="first"' : ""} style="left:${pct(t)}">${mmss(t)}</span>`;
+  }
+  el.innerHTML = html;
+}
+// Muda o passo quando a largura muda (girar o iPad, redimensionar a janela).
+{
+  const ro = new ResizeObserver((entries) => { for (const e of entries) drawRuler(e.target, +e.target.dataset.dur); });
+  ro.observe($("#tlRuler")); ro.observe($("#meRuler"));
+}
+
+// Barra da música: partes coloridas pela energia, curva de energia, marcas
+// das trocas de luz e raios das fritações. head = prefixo dos ids da posição
+// atual (null: quem chama desenha a sua).
+function drawTimeline(tl, T, head) {
+  tl.innerHTML = "";
+  if (!T) { tl.innerHTML = `<div class="empty">Sem timeline</div>`; return; }
+  const dur = T.song.duration || T.analysis.duration || 1, pct = (t) => `${(100 * t / dur).toFixed(3)}%`;
+  for (const s of T.analysis.sections) {
+    const d = document.createElement("div"); d.className = "sec";
+    d.style.left = pct(s.start); d.style.width = pct(s.end - s.start); d.style.background = energyColor(s.energy);
+    const l = document.createElement("span"); l.textContent = s.name || s.group; d.append(l);
+    d.title = `${s.name || ""} ${mmss(s.start)}–${mmss(s.end)} · energia ${s.energy.toFixed(2)}`;
+    tl.append(d);
+  }
+  const ev = T.analysis.energy;
+  if (ev && ev.values.length) {
+    const pts = ev.values.map((v, i) => `${(100 * i * ev.hop / dur).toFixed(2)},${(100 - 70 * v).toFixed(1)}`).join(" ");
+    tl.insertAdjacentHTML("beforeend", `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`);
+  }
+  for (const c of T.cues) {
+    const d = document.createElement("div");
+    d.className = "cue" + (c.layer === "flash" ? " flash" : "");
+    d.style.left = pct(c.t);
+    if (c.layer === "flash") d.innerHTML = ICON.bolt;
+    d.title = `${mmss(c.t)} ${c.kind === "blackout" ? "blackout" : c.name}${c.note ? " — " + c.note : ""}`;
+    tl.append(d);
+  }
+  if (!head) return;
+  const past = document.createElement("div"); past.className = "past"; past.id = head + "Past";
+  const ph = document.createElement("div"); ph.className = "phead"; ph.id = head + "Head"; tl.append(past, ph);
+}
+
+for (const id of ["#tl", "#tlRuler"]) $(id).addEventListener("pointerdown", (e) => {
+  if (!timeline) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const dur = timeline.song.duration || timeline.analysis.duration;
+  send({ type: "seek", t: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur });
+});
+
+function livePos() {
+  if (!player) return 0;
+  const p = player.playing ? player.position + (performance.now() - playerAt) / 1000 : player.position;
+  return Math.min(p, player.duration || p);
+}
+
+function renderPlayer() {
+  const p = player, loaded = p.current >= 0;
+  const song = setlist && setlist.songs[p.current];
+  $("#pTitle").textContent = loaded && song ? song.title : "Nenhuma música carregada";
+  $("#pMeta").textContent = loaded && song ? [song.genre, song.mood].filter(Boolean).join(" · ") : "Escolha uma música da setlist abaixo.";
+  $("#pPlay").disabled = $("#pStop").disabled = !loaded;
+  $("#pPlay").innerHTML = p.playing ? ICON.pause : ICON.play;
+  $("#pState").textContent = p.calibrating ? "Calibrando" : !loaded ? "" : p.playing ? "Tocando agora" : "Pausada";
+  $("#pSound").hidden = !p.audio; $("#pNoAudio").hidden = p.audio;
+  for (const [id, v, fmt] of [["pVol", Math.round(p.volume * 100), (x) => x + "%"], ["pLat", p.latencyMs, (x) => x + " ms"]]) {
+    if (!dragging.has(id)) { $("#" + id).value = v; $("#" + id + "V").textContent = fmt(v); }
+  }
+  $("#pSec").textContent = p.section || "—";
+  $("#pCue").textContent = p.cue || "—";
+  const nx = $("#pNext"); nx.textContent = p.next || "—";
+  if (p.next) { const em = document.createElement("em"); em.textContent = " · " + mmss(p.nextAt); nx.append(em); }
+  const cal = $("#calBtn"); cal.classList.toggle("on", !!p.calibrating); cal.textContent = p.calibrating ? "Parar calibração" : "Calibrar";
+  cal.disabled = !p.audio;
+  if (p.calibrating) { $("#pTitle").textContent = "Calibração de atraso"; $("#pMeta").textContent = "Cliques a 100 BPM — ajuste o atraso na aba Som."; }
+  markCurrent(); tick(); markEditorNow();
+  $("#edOpen").disabled = !timeline || !currentSong();
+  if (ed.file) renderEdHead();
+}
+
+// Destaca a troca de luz que está valendo agora e rola a lista junto com a
+// música: passagem normal rola suave; salto (pulou para frente/trás) rola na
+// hora. Só pausa (3 s) se a pessoa rolar a lista à mão ou estiver num menu.
+// st = {row, paused}: estado de cada lista (Show e editor da aba Músicas).
+function followCues(box, cues, pos, st, force) {
+  let idx = -1;
+  cues.forEach((c, i) => { if (c.layer === "base" && c.t <= pos) idx = i; });
+  // Cada linha: "n" = aqui (a luz atual e fritação acontecendo), "p" = já foi, "f" = vai vir.
+  const marks = cues.map((c, i) => i === idx || (c.layer === "flash" && c.t <= pos && pos < c.t + c.duration) ? "n" : c.t <= pos ? "p" : "f").join("");
+  const rows = box.querySelectorAll(".cue-row");
+  if (marks !== st.marks || force) {
+    st.marks = marks;
+    rows.forEach((r, i) => { r.classList.toggle("now", marks[i] === "n"); r.classList.toggle("past", marks[i] === "p"); });
+  }
+  if (idx === st.row && !force) return;
+  const jump = force || st.row < 0 || Math.abs(idx - st.row) > 2;
+  st.row = idx;
+  if (!rows.length || Date.now() < st.paused || box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") return;
+  const target = idx < 0 ? 0 : (rows[idx - 1] || rows[idx]).offsetTop; // a troca anterior fica visível acima
+  box.scrollTo({ top: target, behavior: jump ? "auto" : "smooth" });
+}
+function pauseFollow(box, st) {
+  for (const ev of ["wheel", "touchmove"]) box.addEventListener(ev, () => { st.paused = Date.now() + 3000; }, { passive: true });
+}
+const showFollow = { row: -1, paused: 0, marks: "" };
+pauseFollow($("#edCues"), showFollow);
+function markEditorNow(force) { if (timeline) followCues($("#edCues"), timeline.cues, livePos(), showFollow, force); }
+
+// Mini player no topo (visível em todas as abas).
+const mini = document.createElement("div"); mini.className = "mini"; mini.hidden = true;
+mini.innerHTML = `<button class="mp" title="Tocar / pausar" aria-label="Tocar / pausar">${ICON.play}</button><div class="mi"><span class="mt"></span><span class="t"></span><i class="mbar"><b></b></i></div>`;
+mini.querySelector("button").onclick = () => send({ type: player && player.playing ? "pause" : "play" });
+$("#miniSlot").prepend(mini);
+
+function tick() {
+  if (!player) return;
+  const pos = livePos(), loaded = player.current >= 0;
+  const t = `${mmss(pos)} / ${mmss(player.duration)}`;
+  $("#pTime").textContent = mmss(pos);
+  $("#pDur").textContent = "/ " + mmss(player.duration);
+  const head = $("#tlHead"), past = $("#tlPast"), dur = timeline && (timeline.song.duration || timeline.analysis.duration);
+  if (head && dur) head.style.left = past.style.width = `${(100 * pos / dur).toFixed(3)}%`;
+  mini.hidden = !loaded && !player.calibrating;
+  const mp = mini.querySelector(".mp"), st = player.playing ? "pause" : "play";
+  if (mp.dataset.st !== st) { mp.dataset.st = st; mp.innerHTML = ICON[st]; }
+  const song = setlist && setlist.songs[player.current];
+  mini.querySelector(".mt").textContent = player.calibrating ? "Calibração de atraso" : song ? song.title : "";
+  mini.querySelector(".t").textContent = t;
+  mini.querySelector(".mbar b").style.width = player.duration ? `${(100 * pos / player.duration).toFixed(2)}%` : "0";
+}
+requestAnimationFrame(function loop() { // começa depois do script inteiro (usa ed, mais abaixo)
+  if (player && player.playing) tick();
+  if (ed.player && ed.player.playing && document.body.dataset.tab === "musicas") pvTick();
+  requestAnimationFrame(loop);
+});
+
+$("#pPlay").onclick = () => send({ type: player && player.playing ? "pause" : "play" });
+$("#pStop").onclick = () => send({ type: "stop" });
+$("#slScan").onclick = () => send({ type: "scan" });
+
+// ---------- envio de músicas (.wav → timeline gerada no servidor) ----------
+let jobs = null;
+const uploads = new Map(); // nome → {pct, error} enquanto o arquivo sobe
+const TEMP = { auto: "cores automáticas", quente: "cores quentes", fria: "cores frias" };
+
+// Fila: completa na aba Músicas; na setlist do Show, só o que está em andamento.
+function renderJobs() {
+  const items = (jobs && jobs.items) || [];
+  const build = (list, all) => {
+    list.innerHTML = "";
+    const row = (name, tags, cls, stage, why, pct) => {
+      const d = document.createElement("div"); d.className = "job " + cls;
+      const b = document.createElement("b"); b.textContent = name;
+      if (tags) { const t = document.createElement("span"); t.className = "tags"; t.style.display = "inline"; t.textContent = " · " + tags; b.append(t); }
+      const st = document.createElement("span"); st.className = "st"; st.textContent = stage;
+      d.append(b, st);
+      if (pct != null) { const bar = document.createElement("span"); bar.className = "bar"; bar.innerHTML = `<i style="width:${Math.round(pct * 100)}%"></i>`; d.append(bar); }
+      if (why) { const w = document.createElement("span"); w.className = "why" + (cls === "bad" ? " err" : ""); w.textContent = why; d.append(w); }
+      list.append(d);
+    };
+    for (const [name, u] of uploads) row(name, "", u.error ? "bad" : "run", u.error ? "falhou" : `enviando ${Math.round(u.pct * 100)}%`, u.error, u.error ? null : u.pct);
+    let n = uploads.size;
+    for (const j of items.slice().reverse()) {
+      if (!all && j.done && !j.error) continue;
+      const cls = j.error ? "bad" : j.done ? "ok" : "run";
+      const tags = [j.ai ? "IA" : "regras", j.temp && j.temp !== "auto" ? TEMP[j.temp] : "", j.voice ? "versão cantada" : "", j.lyrics ? "letra" : ""].filter(Boolean).join(" · ");
+      row(j.file, tags, cls, j.done && !j.error ? "pronta ✓" : j.stage, j.error || j.warning, null);
+      n++;
+    }
+    return n;
+  };
+  $("#imports").hidden = !build($("#jobList"), false);
+  if (!build($("#mJobs"), true)) $("#mJobs").innerHTML = `<p class="hint">Nada na fila. As análises aparecem aqui, etapa por etapa.</p>`;
+}
+
+// Envia o .wav (sem analisar ainda: a análise vai pela mensagem analyze,
+// com as opções e a letra). Devolve o nome com que ficou na pasta, ou null.
+// Com voiceOf (o .wav do playback já na pasta), o arquivo é a versão cantada
+// dele.
+function upload(file, replace, voiceOf) {
+  return new Promise((resolve) => {
+    if (DEMO) return resolve(ws.fakeUpload(file.name, voiceOf));
+    const q = new URLSearchParams(voiceOf ? { name: voiceOf, voz: "1" } : { name: file.name, analisar: "0" });
+    if (replace) q.set("replace", "1");
+    const key = voiceOf ? `${voiceOf.replace(/\.wav$/i, "")} (versão cantada)` : file.name;
+    const x = new XMLHttpRequest();
+    x.open("POST", "api/upload?" + q);
+    uploads.set(key, { pct: 0 }); renderJobs();
+    x.upload.onprogress = (e) => { if (e.lengthComputable) { uploads.get(key).pct = e.loaded / e.total; renderJobs(); } };
+    const fail = (msg) => { uploads.set(key, { pct: 0, error: msg }); renderJobs(); setTimeout(() => { uploads.delete(key); renderJobs(); }, 8000); resolve(null); };
+    x.onerror = () => fail("conexão caiu durante o envio");
+    x.onload = () => {
+      if (x.status === 409 && !replace) {
+        uploads.delete(key); renderJobs();
+        if (confirm(`“${file.name}” já está na setlist. Substituir? A timeline dela (e qualquer edição) será gerada de novo.`)) upload(file, true).then(resolve);
+        else resolve(null);
+        return;
+      }
+      if (x.status >= 300) return fail(x.responseText.trim() || `erro ${x.status}`);
+      uploads.delete(key); renderJobs();
+      try { resolve(JSON.parse(x.responseText).file); } catch { resolve(file.name); }
+    };
+    x.send(file);
+  });
+}
+
+// ---------- músicas: escolher, analisar e reanalisar ----------
+// mSel: {kind: "new", files} | {kind: "song", file, song} | {kind: "orphan", wav}
+// Uma música da setlist abre o editor com a prévia; mRe = formulário de
+// "Analisar de novo" aberto no lugar do editor.
+let mSel = null, mRe = false, mTemp = "auto", mLyricsFor = null;
+// Versão cantada escolhida no formulário: file = .wav novo; drop = tirar a guardada.
+const mVoice = { file: null, drop: false };
+
+function tempTag(t) { return t === "quente" ? ["warm", "quentes"] : t === "fria" ? ["cold", "frias"] : null; }
+
+function renderMusicas() {
+  const list = $("#mSongs"); list.innerHTML = "";
+  const songs = setlist ? setlist.songs : [], orphans = (setlist && setlist.orphans) || [];
+  const n = songs.length + orphans.length;
+  $("#mCount").textContent = n ? `· ${n}` : "";
+  const row = (title, dur, tags, sel, pick) => {
+    const b = document.createElement("button"); b.className = "opt" + (sel ? " sel" : "");
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = title;
+    const tg = document.createElement("span"); tg.className = "tags";
+    for (const [cls, txt] of tags) { const t = document.createElement("span"); t.className = "tag " + cls; t.textContent = txt; tg.append(t); }
+    nm.append(tg); b.append(nm);
+    if (dur) { const d = document.createElement("span"); d.className = "d"; d.textContent = dur; b.append(d); }
+    b.onclick = pick;
+    list.append(b);
+  };
+  for (const so of songs) {
+    const tags = [];
+    if (so.error) tags.push(["", so.error]);
+    else {
+      tags.push(["", so.ai ? "IA" : "regras"]);
+      const tt = tempTag(so.temp); if (tt) tags.push(tt);
+      if (so.voice) tags.push(["", "versão cantada"]);
+      else if (so.lyrics) tags.push(["", "letra"]);
+      if (so.edited) tags.push(["", "editada"]);
+    }
+    row(so.title, mmss(so.duration), tags, mSel && mSel.kind === "song" && mSel.file === so.file, () => selectSong({ kind: "song", file: so.file, song: so }));
+  }
+  for (const w of orphans) row(w.replace(/\.wav$/i, ""), "", [["new", "sem timeline"]], mSel && mSel.kind === "orphan" && mSel.wav === w, () => selectSong({ kind: "orphan", wav: w }));
+  if (!n) list.innerHTML = `<p class="hint" style="margin:6px 10px">Nenhuma música na pasta ainda.</p>`;
+  // A música escolhida pode ter mudado (reanálise pronta, nova timeline) ou sumido.
+  if (mSel && mSel.kind === "song") {
+    const so = songs.find((x) => x.file === mSel.file);
+    if (so) mSel.song = so;
+    else { mSel = null; closeEditor(); }
+  } else if (mSel && mSel.kind === "orphan" && !orphans.includes(mSel.wav)) {
+    const so = songs.find((x) => x.wav === mSel.wav); // analisada: abre no editor
+    mSel = so ? { kind: "song", file: so.file, song: so } : null;
+    if (so) { mRe = false; openEditor(so); }
+  }
+  renderMForm();
+  if (ed.file) renderEdHead();
+}
+
+function selectSong(sel) {
+  if (sel.kind !== "song") closeEditor();
+  mSel = sel; mRe = sel.kind !== "song";
+  if (sel.kind === "song") openEditor(sel.song);
+  else openForm();
+  renderMusicas();
+  if (matchMedia("(max-width: 899px)").matches) (sel.kind === "song" ? $("#mEdit") : $(".mform")).scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Abre o formulário de análise da música escolhida (com a letra guardada).
+function openForm() {
+  const wav = mSel.kind === "song" ? mSel.song.wav : mSel.wav;
+  mTemp = (mSel.song && mSel.song.temp) || "auto";
+  $("#mLyrics").value = ""; mLyricsFor = null; mVoice.file = null; mVoice.drop = false;
+  if (wav) loadLyrics(wav);
+}
+
+async function loadLyrics(wav) {
+  try {
+    const text = DEMO ? ws.lyricsOf(wav) : await fetch("api/lyrics?file=" + encodeURIComponent(wav)).then((r) => { if (!r.ok) throw r; return r.text(); });
+    if (mSel && formWav() === wav) { $("#mLyrics").value = text.trim(); mLyricsFor = wav; renderMForm(); }
+  } catch { /* sem letra carregada: a análise mantém a guardada */ }
+}
+const formWav = () => mSel && (mSel.kind === "song" ? mSel.song.wav : mSel.wav);
+
+function selectFiles(files) {
+  files = files.filter((f) => /\.wav$/i.test(f.name));
+  if (!files.length) { alert("Envie arquivos .wav (exporte a faixa em WAV)."); return; }
+  closeEditor();
+  mSel = { kind: "new", files }; mRe = true; mTemp = "auto"; mLyricsFor = null; mVoice.file = null; mVoice.drop = false;
+  $("#mLyrics").value = "";
+  renderMusicas();
+}
+
+function renderMForm() {
+  const s = mSel, ai = !!(jobs && jobs.ai);
+  const editor = !!s && s.kind === "song" && !mRe;
+  $("#mEdit").hidden = !editor; $(".mform").hidden = editor;
+  $("#mEmpty").hidden = !!s; $("#mBody").hidden = !s; $("#mCancel").hidden = !s;
+  if (!s) { $("#mHead").textContent = "Enviar músicas"; return; }
+  if (editor) return;
+  const many = s.kind === "new" && s.files.length > 1;
+  const title = s.kind === "new" ? s.files.map((f) => f.name).join(", ") : s.kind === "song" ? s.song.title : s.wav;
+  $("#mHead").textContent = s.kind === "new" ? (many ? `${s.files.length} músicas novas` : "Música nova") : s.kind === "song" ? "Analisar de novo" : "Analisar";
+  $("#mCancel").textContent = s.kind === "song" ? "Voltar à luz" : "Cancelar";
+  const tg = $("#mTarget"); tg.textContent = title;
+  const sub = document.createElement("small");
+  sub.textContent = s.kind === "song" ? [mmss(s.song.duration), s.song.ai ? "luz atual gerada com IA" : "luz atual gerada por regras", s.song.temp && s.song.temp !== "auto" ? TEMP[s.song.temp] : ""].filter(Boolean).join(" · ")
+    : s.kind === "new" ? "Ainda não enviada: o envio começa ao tocar no botão abaixo." : "Já está na pasta, mas ainda não tem luz.";
+  tg.append(sub);
+  for (const b of $("#mTemp").children) b.classList.toggle("sel", b.dataset.temp === mTemp);
+  $("#mTempHint").textContent = mTemp === "quente" ? "Vermelho, âmbar, dourado, laranja. Presets mistos (FESTA, BATIDÃO…) e o branco só entram onde faltar opção."
+    : mTemp === "fria" ? "Azul, ciano, verde, roxo, violeta. Há poucos presets frios agitados (CLUB), então nas partes fortes podem entrar mistos (BATIDÃO, FLASH)."
+    : "Paleta livre: a IA escolhe pelo clima da música (sem IA, as regras usam todas as cores).";
+  $("#mAIrow").hidden = !ai;
+  const useAI = ai && $("#mAI").checked;
+  // Versão cantada: a guardada (música da setlist) ou a escolhida agora.
+  const stored = s.kind === "song" ? !!s.song.voice : s.kind === "orphan" ? !!(setlist && (setlist.voices || []).includes(s.wav)) : false;
+  const hasVoice = !many && (!!mVoice.file || stored && !mVoice.drop);
+  $("#mVoiceField").hidden = many;
+  const vn = $("#mVoiceName");
+  vn.textContent = mVoice.file ? mVoice.file.name : stored && !mVoice.drop ? "guardada ✓" : stored ? "será tirada" : "nenhuma";
+  vn.className = "vname" + (hasVoice ? "" : " none");
+  $("#mVoicePick").textContent = hasVoice ? "Trocar…" : "Escolher .wav…";
+  $("#mVoiceDrop").hidden = !hasVoice;
+  $("#mVoiceHint").textContent = !useAI ? "A mesma faixa do playback, com a voz. Sem IA ela fica guardada, mas não é usada."
+    : "A mesma faixa do playback, só que com a voz (mesma duração). A IA transcreve a letra e, quando ela cita uma cor (“verde-limão”), a cor acende na palavra por alguns compassos. No show toca só o playback.";
+  const ly = $("#mLyrics"); ly.disabled = many;
+  $("#mLyricsHint").textContent = many ? "Uma letra por música: para usar a letra, envie uma música de cada vez."
+    : !useAI ? "Sem IA a letra não é usada (fica guardada para a próxima análise com IA)."
+    : hasVoice ? "Com a versão cantada, a letra colada só ajuda a IA a acertar as palavras difíceis na transcrição."
+    : "Sem a versão cantada, a IA não sabe o segundo de cada verso: ela casa a letra com as partes e, se a letra citar uma cor, acende essa cor no começo da parte, por alguns compassos (criando a cor se ela não existir).";
+  const warn = $("#mWarn"), warns = [];
+  if (s.kind === "song") {
+    warns.push(s.song.edited ? "A luz desta música foi editada à mão: analisar de novo substitui a timeline e as edições se perdem." : "Analisar de novo substitui a timeline atual desta música.");
+    if (player && player.current === s.song.index && player.playing) warns.push("Ela está tocando agora: a luz muda assim que a análise terminar.");
+  }
+  warn.hidden = !warns.length; warn.textContent = warns.join(" ");
+  $("#mGo").textContent = s.kind === "new" ? (many ? `Enviar ${s.files.length} e analisar` : "Enviar e analisar") : s.kind === "song" ? "Analisar de novo" : "Analisar";
+}
+
+$("#mTemp").addEventListener("click", (e) => { const b = e.target.closest("[data-temp]"); if (b) { mTemp = b.dataset.temp; renderMForm(); } });
+$("#mVoicePick").onclick = () => $("#mVoiceFile").click();
+$("#mVoiceFile").onchange = (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  if (!/\.wav$/i.test(f.name)) { alert("A versão cantada também precisa ser .wav."); return; }
+  mVoice.file = f; mVoice.drop = false; renderMForm();
+};
+$("#mVoiceDrop").onclick = () => { mVoice.file = null; mVoice.drop = true; renderMForm(); };
+$("#mAI").onchange = renderMForm;
+$("#mCancel").onclick = () => { if (mSel && mSel.kind === "song") mRe = false; else mSel = null; renderMusicas(); };
+$("#meAnalyze").onclick = () => { if (!mSel || mSel.kind !== "song") return; if (ed.player) ed.player.pause(); mRe = true; openForm(); renderMusicas(); };
+$("#mPick").onclick = $("#mDrop").onclick = () => $("#mFile").click();
+$("#mFile").onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; if (files.length) selectFiles(files); };
+$("#slAdd").onclick = () => { history.replaceState(null, "", "#musicas"); showTab("musicas"); scrollTo(0, 0); };
+for (const ev of ["dragenter", "dragover"]) $("#musicas").addEventListener(ev, (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { e.preventDefault(); $("#musicas").classList.add("over"); } });
+$("#musicas").addEventListener("dragleave", (e) => { if (!e.relatedTarget || !$("#musicas").contains(e.relatedTarget)) $("#musicas").classList.remove("over"); });
+$("#musicas").addEventListener("drop", (e) => { e.preventDefault(); $("#musicas").classList.remove("over"); selectFiles([...e.dataTransfer.files]); });
+
+$("#mGo").onclick = async () => {
+  const s = mSel; if (!s) return;
+  const opts = { ai: !!(jobs && jobs.ai) && $("#mAI").checked, temp: mTemp };
+  const ly = $("#mLyrics");
+  // Letra: o que está no campo substitui a guardada; null = não mexer (vários
+  // arquivos, ou a letra guardada ainda não chegou).
+  const lyrics = ly.disabled || (s.kind !== "new" && mLyricsFor !== formWav() && !ly.value.trim()) ? null : ly.value;
+  if (s.kind === "song" && !confirm(`${$("#mWarn").textContent}\n\nContinuar?`)) return;
+  const voice = { ...mVoice }; mVoice.file = null; mVoice.drop = false;
+  // Manda a versão cantada escolhida (depois do playback) e pede a análise.
+  const go = async (wav, lyr) => {
+    if (voice.file && !(await upload(voice.file, false, wav))) return;
+    send({ type: "analyze", str: wav, ...opts, lyrics: lyr, noVoice: voice.drop });
+  };
+  if (s.kind === "song") { mRe = false; renderMusicas(); go(s.song.wav, lyrics); return; } // o editor se atualiza quando ficar pronta
+  mSel = null; renderMusicas();
+  if (s.kind === "orphan") { go(s.wav, lyrics); return; }
+  for (const f of s.files) { // um por vez: o Wi-Fi do show agradece
+    const name = await upload(f, false);
+    if (name) await go(name, s.files.length === 1 ? lyrics : null);
+  }
+};
+for (const [id, type, fmt] of [["pVol", "volume", (x) => x + "%"], ["pLat", "latency", (x) => x + " ms"]]) {
+  const input = $("#" + id);
+  input.addEventListener("pointerdown", () => dragging.add(id));
+  const stop = () => dragging.delete(id);
+  input.addEventListener("pointerup", stop); input.addEventListener("pointercancel", stop); input.addEventListener("change", stop);
+  input.addEventListener("input", () => { $("#" + id + "V").textContent = fmt(+input.value); send({ type, value: +input.value }); });
+}
+
+// ---------- som: saídas, Bluetooth, atraso ----------
+let sound = null;
+const KIND = { bluetooth: ["🔵", "Bluetooth"], wired: ["🎧", "Cabo (P2)"], builtin: ["💻", "Alto-falante"], hdmi: ["🖥", "HDMI / monitor"], other: ["🔈", "Outra saída"] };
+
+function renderSound() {
+  const sn = sound;
+  const miss = $("#sndMissing");
+  miss.hidden = !(sn.missing && sn.missing.length);
+  if (!miss.hidden) miss.textContent = sn.platform === "darwin"
+    ? `Para controlar a saída e o Bluetooth por aqui, instale no Mac: brew install ${sn.missing.join(" ")}`
+    : `Ferramentas ausentes: ${sn.missing.join(", ")}`;
+  $("#sndBusy").textContent = sn.busy || "";
+  const err = $("#sndErr"); err.hidden = !sn.error; err.textContent = sn.error || "";
+  $("#btScan").disabled = !!sn.busy || !sn.available;
+
+  const outs = $("#sndOuts"); outs.innerHTML = "";
+  for (const o of sn.outputs || []) {
+    const b = document.createElement("button");
+    b.className = "opt" + (o.default ? " sel" : "");
+    const [ic, kind] = KIND[o.kind] || KIND.other;
+    b.innerHTML = `<span class="ic">${ic}</span><span class="nm"></span>`;
+    const nm = b.querySelector(".nm"); nm.textContent = o.name;
+    const sm = document.createElement("small"); sm.textContent = kind + (o.default ? " · em uso" : ""); nm.append(sm);
+    b.disabled = !!sn.busy;
+    b.onclick = () => { if (!o.default) send({ type: "sound", arg: "output", str: o.id }); };
+    outs.append(b);
+  }
+  if (!(sn.outputs || []).length) outs.innerHTML = `<p class="hint">Nenhuma saída encontrada.</p>`;
+
+  const devs = $("#btDevs"); devs.innerHTML = "";
+  for (const d of sn.devices || []) {
+    const row = document.createElement("div"); row.className = "dev";
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.name + (d.address === sn.speaker ? " ★" : "");
+    const st = document.createElement("small");
+    st.textContent = d.connected ? "conectada" : d.paired ? "pareada, desconectada" : "encontrada (não pareada)";
+    if (d.connected) st.className = "on";
+    nm.append(st); row.append(nm);
+    const btn = (label, arg, confirmText) => {
+      const b = document.createElement("button"); b.className = "small"; b.textContent = label; b.disabled = !!sn.busy;
+      b.onclick = () => { if (!confirmText || confirm(confirmText)) send({ type: "sound", arg, str: d.address }); };
+      row.append(b);
+    };
+    if (!d.paired) btn("Parear", "pair");
+    else if (d.connected) btn("Desconectar", "disconnect");
+    else btn("Conectar", "connect");
+    if (d.paired) btn("Esquecer", "forget", `Esquecer “${d.name}”? Vai precisar parear de novo.`);
+    devs.append(row);
+  }
+  if (!(sn.devices || []).length) devs.innerHTML = `<p class="hint">Nenhuma caixa conhecida. Toque em “Procurar caixas”.</p>`;
+}
+
+$("#btScan").onclick = () => send({ type: "sound", arg: "scan" });
+$("#calBtn").onclick = () => send({ type: player && player.calibrating ? "stop" : "calibrate" });
+
+// ---------- setlist: arrastar para mudar a ordem ----------
+let drag = null, dragEnded = false;
+$("#setlist").addEventListener("pointerdown", (e) => {
+  const grip = e.target.closest(".grip"); if (!grip) return;
+  e.preventDefault();
+  const row = grip.closest(".songwrap");
+  grip.setPointerCapture(e.pointerId);
+  drag = { row, before: [...$("#setlist").children].map((r) => r.dataset.file).join("|") };
+  row.classList.add("dragging");
+});
+$("#setlist").addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const list = $("#setlist");
+  const rows = [...list.children].filter((r) => r !== drag.row);
+  const after = rows.find((r) => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; });
+  if (after) list.insertBefore(drag.row, after); else list.append(drag.row);
+});
+const endDrag = () => {
+  if (!drag) return;
+  drag.row.classList.remove("dragging");
+  const files = [...$("#setlist").children].map((r) => r.dataset.file);
+  if (files.join("|") !== drag.before) send({ type: "reorder", files });
+  drag = null; dragEnded = true; setTimeout(() => { dragEnded = false; }, 50);
+};
+$("#setlist").addEventListener("pointerup", endDrag);
+$("#setlist").addEventListener("pointercancel", endDrag);
+
+// ---------- luz da música: presets e batidas ----------
+const clone = (x) => JSON.parse(JSON.stringify(x));
+function allButtons() { const out = []; for (const g of (config ? config.groups : [])) for (const b of g.buttons) out.push({ ...b, layer: g.layer, group: g.name }); return out; }
+function buttonFor(preset) { return allButtons().find((b) => b.preset === preset); }
+// Cor de amostra de um preset: botão do console, cor da biblioteca ou cor criada ("cor:#rrggbb").
+function presetColor(preset) {
+  if (preset && preset.startsWith("cor:")) return preset.slice(4);
+  const b = buttonFor(preset) || ((config && config.library) || []).find((x) => x.preset === preset);
+  return (b && b.color) || "transparent";
+}
+const fmtT = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+const beatLen = (T) => 60 / ((T && T.analysis.bpm) || 120);
+function nearestBeat(T, t) { const bs = T.analysis.beats || []; if (!bs.length) return t; return bs.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a)); }
+function stepBeat(T, t, dir) {
+  const bs = T.analysis.beats || [];
+  if (!bs.length) return Math.max(0, t + dir * beatLen(T));
+  return dir > 0 ? (bs.find((b) => b > t + 0.01) ?? t) : ([...bs].reverse().find((b) => b < t - 0.01) ?? 0);
+}
+const songDur = (T) => (T && (T.song.duration || T.analysis.duration)) || 0;
+const cueText = (c) => c.kind === "blackout" ? "tudo apagado" : c.name || c.preset;
+const layerText = (c) => c.kind === "blackout" ? "Apagar" : c.layer === "flash" ? "Fritação" : "Luz";
+
+// ---------- aba Show: a luz da música carregada, só leitura ----------
+let edEdited = false;
+function currentSong() { return player && setlist && setlist.songs[player.current]; }
+function renderShowCues() {
+  const box = $("#edCues"); box.innerHTML = ""; showFollow.row = -1;
+  $("#edStatus").textContent = timeline && edEdited ? "editada" : "";
+  $("#edOpen").disabled = !timeline || !currentSong();
+  if (!timeline) { box.innerHTML = `<p class="hint" style="margin:10px">Carregue uma música para ver as trocas de luz.</p>`; return; }
+  for (const c of timeline.cues) {
+    const row = document.createElement("div"); row.className = "cue-row ro";
+    const t = document.createElement("span"); t.className = "t"; t.textContent = fmtT(c.t);
+    const ly = document.createElement("span"); ly.className = "ly " + c.layer; ly.textContent = layerText(c);
+    const what = document.createElement("span"); what.className = "what";
+    if (c.kind !== "blackout") { const sw = document.createElement("i"); sw.className = "sw"; sw.style.background = presetColor(c.preset); what.append(sw); }
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = cueText(c); what.append(nm);
+    if (c.layer === "flash") { const d = document.createElement("span"); d.className = "dur"; d.textContent = `${Math.max(1, Math.round(c.duration / beatLen(timeline)))} bat.`; what.append(d); }
+    row.title = c.note || "";
+    const go = document.createElement("button"); go.className = "small go"; go.textContent = "Aqui";
+    go.title = "Levar o show até esta troca de luz";
+    go.onclick = () => { showFollow.paused = 0; send({ type: "seek", t: c.t + 0.01 }); }; // um tico depois, para já valer a troca
+    row.append(t, ly, what, go); box.append(row);
+  }
+  if (!timeline.cues.length) box.innerHTML = `<p class="hint" style="margin:10px">Nenhuma troca de luz.</p>`;
+  markEditorNow(true);
+}
+// "Editar" leva a música carregada para o editor da aba Músicas.
+$("#edOpen").onclick = () => {
+  const so = currentSong(); if (!so) return;
+  history.replaceState(null, "", "#musicas"); showTab("musicas"); scrollTo(0, 0);
+  selectSong({ kind: "song", file: so.file, song: so });
+};
+
+// ---------- aba Músicas: prévia 2D e editor da luz ----------
+// O editor abre qualquer música da setlist, carregada no show ou não. A
+// prévia toca o .wav neste aparelho (não na caixa do show) e mostra a luz
+// que o servidor calcula para cada canhão (GET /api/preview), sem tocar no
+// DMX. Strobo e trocas rápidas aparecem parados, com ícone: nunca piscando.
+const PV_FPS = 10;
+const ed = { file: null, tl: null, draft: null, edited: false, saved: true, undo: [], timer: null,
+  pv: null, pvSeq: 0, player: null, err: "", follow: { row: -1, paused: 0, marks: "" }, sample: -2, paint: "", strobing: false };
+pauseFollow($("#meCues"), ed.follow);
+
+// Player da prévia: o .wav num <audio>; no modo demonstração (ou se o
+// navegador não tocar o arquivo), um relógio sem som.
+function clockPlayer(duration) {
+  let base = 0, since = 0, run = false;
+  const now = () => run ? Math.min(duration, base + (performance.now() - since) / 1000) : base;
+  return {
+    get time() { return now(); },
+    get playing() { if (run && now() >= duration) { base = duration; run = false; pvTick(true); } return run; },
+    play() { if (base >= duration) base = 0; since = performance.now(); run = true; pvTick(true); },
+    pause() { base = now(); run = false; pvTick(true); },
+    seek(t) { base = Math.max(0, Math.min(duration, t)); since = performance.now(); pvTick(true); },
+    stop() { run = false; },
+  };
+}
+// Com voice, toca a versão cantada; shift (s) é o atraso dela em relação ao
+// playback (vem da análise), descontado para a luz continuar no tempo.
+function audioPlayer(file, duration, voice, shift = 0) {
+  const a = new Audio(); a.preload = "auto";
+  if (!voice) shift = 0;
+  let p = null;
+  const fallback = () => { // sem som: segue num relógio a partir do mesmo ponto
+    if (ed.player !== p) return;
+    const t = a.currentTime || 0; a.removeAttribute("src"); a.load();
+    ed.player = clockPlayer(duration); ed.player.seek(t);
+    pvNote("Este navegador não conseguiu tocar o áudio: a prévia anda sem som.", true);
+  };
+  a.addEventListener("error", fallback);
+  for (const ev of ["play", "pause", "seeked", "ended"]) a.addEventListener(ev, () => { if (ed.player === p) pvTick(true); });
+  a.src = "api/audio?file=" + encodeURIComponent(file) + (voice ? "&voz=1" : "");
+  p = {
+    get time() { return Math.max(0, (a.currentTime || 0) - shift); },
+    get playing() { return !a.paused && !a.ended; },
+    play() { a.play().catch((e) => { if (e.name !== "AbortError") fallback(); }); },
+    pause() { a.pause(); },
+    seek(t) { a.currentTime = Math.max(0, Math.min(duration || a.duration || 0, t) + shift); pvTick(true); },
+    stop() { a.pause(); a.removeAttribute("src"); a.load(); },
+  };
+  return p;
+}
+
+function openEditor(so) {
+  if (ed.file === so.file) return;
+  closeEditor();
+  Object.assign(ed, { file: so.file, edited: so.edited, voice: false });
+  $("#pvVoice").checked = false;
+  ed.player = DEMO ? clockPlayer(so.duration) : audioPlayer(so.file, so.duration);
+  pvNote();
+  buildStage(); renderEd(); loadEd();
+}
+function closeEditor() {
+  if (ed.file && !ed.saved) edSave();
+  if (ed.player) ed.player.stop();
+  Object.assign(ed, { file: null, tl: null, draft: null, saved: true, undo: [], pv: null, player: null, err: "", sample: -2, lyr: -2 });
+  ed.follow.row = -1; ed.pvSeq++;
+}
+
+const okJSON = async (r) => { if (!r.ok) throw new Error((await r.text()).trim() || `erro ${r.status}`); return r.json(); };
+async function loadEd() {
+  const file = ed.file;
+  try {
+    const m = DEMO ? ws.timelineOf(file) : await fetch("api/timeline?file=" + encodeURIComponent(file)).then(okJSON);
+    if (ed.file !== file) return;
+    ed.tl = m.timeline; ed.draft = clone(m.timeline); ed.edited = m.edited; ed.undo = []; ed.err = "";
+  } catch (e) {
+    if (ed.file !== file) return;
+    ed.err = `Não deu para abrir a luz desta música: ${e.message || e}`;
+  }
+  renderEd(); loadPreview();
+}
+async function loadPreview() {
+  const file = ed.file, seq = ++ed.pvSeq;
+  if (!file) return;
+  try {
+    const pv = DEMO ? ws.previewOf(file, PV_FPS) : await fetch(`api/preview?file=${encodeURIComponent(file)}&fps=${PV_FPS}`).then(okJSON);
+    if (seq !== ed.pvSeq) return;
+    const n = pv.positions.length ? pv.positions[0].fx.length : 0;
+    const rebuild = !ed.pv || ed.pv.pos.length !== pv.positions.length;
+    ed.pv = { fps: pv.fps, duration: pv.duration, n, pos: pv.positions };
+    if (rebuild) buildStage();
+    ed.sample = -2; drawStrip(); pvTick(true);
+  } catch (e) {
+    if (seq === ed.pvSeq) pvNote(`Prévia indisponível: ${e.message || e}`, true);
+  }
+}
+
+// A timeline da música mudou no servidor (edição salva, restauração ou
+// análise nova): atualiza o editor, sem atropelar uma edição em andamento.
+function onSongTimeline(m) {
+  if (m.file !== ed.file) return;
+  const regenerated = !ed.tl || JSON.stringify(ed.tl.generated) !== JSON.stringify(m.timeline.generated);
+  ed.tl = m.timeline; ed.edited = !!m.edited;
+  if (ed.saved || regenerated) {
+    if (regenerated) { ed.undo = []; clearTimeout(ed.timer); ed.saved = true; }
+    ed.draft = clone(m.timeline); renderEdList();
+  }
+  edStatus(); loadPreview();
+}
+
+// ---------- palco 2D ----------
+// Duas vistas, da plateia: "trelica" (padrão) = pendurados, fachos para
+// baixo; "chao" = como no show (canhões no chão, o da esquerda mirando para a
+// direita, o da direita para a esquerda e os do meio para a frente, na plateia).
+// Strobo e fritação piscam de verdade na prévia, mas no máximo FLASH_HZ
+// vezes por segundo (limite usual para fotossensibilidade); dá para desligar.
+const BOLT_PATH = "M13.5 2 4 14h6.5l-1 8L19 10h-6.5z";
+const FLASH_HZ = 2.9;
+const pref = (k, def) => { try { return localStorage.getItem(k) ?? def; } catch { return def; } };
+const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const pvOpt = {
+  view: pref("luzes-palco", "trelica"),
+  flash: pref("luzes-piscar", matchMedia("(prefers-reduced-motion: reduce)").matches ? "0" : "1") === "1",
+};
+const fxBadge = (x, y) => `<g class="fx" transform="translate(${x} ${y})" hidden><title></title><circle r="11"/><path d="${BOLT_PATH}" transform="translate(-7.2 -7.2) scale(.6)"/><text y="1">≋</text></g>`;
+// Gradientes de cada canhão: facho (do canhão para longe) e poça/brilho.
+const beamDefs = (i, x1, y1, x2, y2) => `<defs>
+  <linearGradient id="pvB${i}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="#000" stop-opacity=".95"/><stop offset=".75" stop-color="#000" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+  <radialGradient id="pvP${i}"><stop offset="0" stop-color="#000" stop-opacity=".9"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+</defs>`;
+const f1 = (v) => (+v).toFixed(1);
+
+function stageTruss(names, W) {
+  const n = names.length, w = W / n;
+  let body = "";
+  names.forEach((nm, i) => {
+    const x = w * (i + 0.5), spread = w * 0.38;
+    body += `<g class="pvc">${beamDefs(i, x, 46, x, 186)}
+      <path class="beam" d="M${f1(x - 8)} 46 L${f1(x + 8)} 46 L${f1(x + spread)} 186 L${f1(x - spread)} 186 Z" fill="url(#pvB${i})"/>
+      <ellipse class="pool" cx="${f1(x)}" cy="186" rx="${f1(w * 0.46)}" ry="12" fill="url(#pvP${i})"/>
+      <rect class="head" x="${f1(x - 17)}" y="17" width="34" height="26" rx="7"/>
+      <circle class="lens" cx="${f1(x)}" cy="42" r="8"/>
+      ${fxBadge(f1(x + 20), 16)}
+      <text class="pvname" x="${f1(x)}" y="204">${esc(nm)}</text>
+    </g>`;
+  });
+  return `<rect class="floor" x="0" y="184" width="${W}" height="28"/><rect class="truss" x="10" y="10" width="${W - 20}" height="7" rx="3.5"/>${body}`;
+}
+
+function stageFloor(names, W, H) {
+  const n = names.length, w = W / n, fy = 178; // linha dos canhões no chão
+  let body = "";
+  names.forEach((nm, i) => {
+    const x = w * (i + 0.5);
+    const aim = n > 1 && i === 0 ? 1 : n > 1 && i === n - 1 ? -1 : 0; // 1 = para a direita, -1 = para a esquerda, 0 = para a frente
+    if (aim) {
+      // Facho cruzado: sobe atravessando o palco até a parede do outro lado.
+      const ex = aim > 0 ? W - 70 : 70, ey = 34, dx = ex - x, dy = ey - fy, len = Math.hypot(dx, dy);
+      const px = -dy / len, py = dx / len, ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      const lx = x + 14 * dx / len, ly = fy + 14 * dy / len; // lente na frente do corpo
+      const pt = (cx, cy, k) => `${f1(cx + px * k)} ${f1(cy + py * k)}`;
+      body += `<g class="pvc">${beamDefs(i, lx, ly, ex, ey)}
+        <ellipse class="pool" cx="${f1(ex)}" cy="${ey + 6}" rx="62" ry="38" fill="url(#pvP${i})"/>
+        <path class="beam" d="M${pt(lx, ly, 6)} L${pt(ex, ey, 62)} L${pt(ex, ey, -62)} L${pt(lx, ly, -6)} Z" fill="url(#pvB${i})"/>
+        <path class="yoke" d="M${f1(x - 13)} ${fy + 12} L${f1(x + 13)} ${fy + 12} L${f1(x + 8)} ${fy + 2} L${f1(x - 8)} ${fy + 2} Z"/>
+        <g transform="rotate(${f1(ang)} ${f1(x)} ${fy})"><rect class="head" x="${f1(x - 16)}" y="${fy - 10}" width="30" height="20" rx="6"/></g>
+        <circle class="lens" cx="${f1(lx)}" cy="${f1(ly)}" r="6"/>
+        ${fxBadge(f1(x - aim * 20), fy - 22)}
+        <text class="pvname" x="${f1(x)}" y="204">${esc(nm)}</text>
+      </g>`;
+    } else {
+      // Para a frente (a plateia): brilho na lente e o facho abrindo em direção a quem olha.
+      body += `<g class="pvc">${beamDefs(i, x, fy, x, H + 30)}
+        <path class="beam" d="M${f1(x - 6)} ${fy} L${f1(x + 6)} ${fy} L${f1(x + w * 0.42)} ${H + 30} L${f1(x - w * 0.42)} ${H + 30} Z" fill="url(#pvB${i})"/>
+        <path class="yoke" d="M${f1(x - 15)} ${fy + 16} L${f1(x + 15)} ${fy + 16} L${f1(x + 10)} ${fy + 6} L${f1(x - 10)} ${fy + 6} Z"/>
+        <rect class="head" x="${f1(x - 16)}" y="${fy - 14}" width="32" height="26" rx="8"/>
+        <ellipse class="pool" cx="${f1(x)}" cy="${fy}" rx="46" ry="40" fill="url(#pvP${i})"/>
+        <circle class="lens" cx="${f1(x)}" cy="${fy - 1}" r="9"/>
+        ${fxBadge(f1(x + 22), fy - 22)}
+        <text class="pvname" x="${f1(x)}" y="206">${esc(nm)}</text>
+      </g>`;
+    }
+  });
+  // Parede do fundo, chão em perspectiva e o cantor (silhueta) no meio.
+  const cx = W / 2;
+  return `<rect class="wall" x="0" y="0" width="${W}" height="150"/>
+    <path class="floor" d="M0 ${H} L${W} ${H} L${W - 36} 150 L36 150 Z"/>
+    <g class="singer"><circle cx="${cx}" cy="98" r="9"/><path d="M${cx - 13} 165 L${cx - 11} 126 Q${cx} 108 ${cx + 11} 126 L${cx + 13} 165 Z"/>
+      <path d="M${cx + 24} 165 L${cx + 24} 112 M${cx + 24} 112 L${cx + 12} 108" class="mic"/></g>${body}`;
+}
+
+function buildStage() {
+  const names = ed.pv ? ed.pv.pos.map((p) => p.name) : state ? state.positions.map((p) => p.name) : ["esquerda", "centro", "direita"];
+  const W = 480, H = 212;
+  const inner = pvOpt.view === "trelica" ? stageTruss(names, W) : stageFloor(names, W, H);
+  $("#pvStage").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Prévia do palco, vista da plateia">${inner}</svg>`;
+  ed.sample = -2; ed.paint = "";
+  for (const b of $("#pvView").children) b.classList.toggle("sel", b.dataset.view === pvOpt.view);
+  $("#pvFlash").checked = pvOpt.flash;
+  // Rótulos das trilhas da faixa de cores.
+  $("#pvLabs").innerHTML = names.map((nm, i) => `<span style="bottom:${(names.length - 1 - i) * 15 + 2}px">${esc(nm)}</span>`).join("");
+}
+// Pinta o palco na amostra i. off = fase apagada do strobo (canhões com strobo ficam pretos).
+function paintStage(i, off) {
+  const groups = $("#pvStage").querySelectorAll(".pvc"), pv = ed.pv;
+  $("#pvStage").classList.toggle("strobing", ed.strobing);
+  groups.forEach((g, k) => {
+    const p = pv && pv.pos[k];
+    const fx = p && i >= 0 ? +p.fx[i] : 0;
+    const c = !p || i < 0 || (off && fx & 1) ? "#000000" : "#" + p.colors.substr(i * 6, 6);
+    for (const st of g.querySelectorAll("stop")) st.style.stopColor = c;
+    g.querySelector(".lens").style.fill = c === "#000000" ? "" : c;
+    const badge = g.querySelector(".fx");
+    badge.toggleAttribute("hidden", !fx);
+    badge.querySelector("path").style.display = fx & 1 ? "" : "none";
+    badge.querySelector("text").style.display = fx & 1 ? "none" : "";
+    badge.querySelector("title").textContent = fx & 1 ? (pvOpt.flash ? "strobo (na prévia pisca no máximo 3 vezes por segundo)" : "strobo") : "troca rápida de cor (a prévia mostra a média)";
+  });
+}
+$("#pvView").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]"); if (!b) return;
+  pvOpt.view = b.dataset.view; setPref("luzes-palco", pvOpt.view);
+  buildStage(); pvTick(true);
+});
+$("#pvFlash").onchange = (e) => { pvOpt.flash = e.target.checked; setPref("luzes-piscar", pvOpt.flash ? "1" : "0"); pvTick(true); };
+
+// ---------- faixa de cores: uma trilha por canhão sob a barra da música ----------
+let hatch = null;
+function hatchPattern(ctx) {
+  if (hatch) return hatch;
+  const c = document.createElement("canvas"); c.width = c.height = 8;
+  const x = c.getContext("2d");
+  x.strokeStyle = "rgba(255,255,255,.5)"; x.lineWidth = 1.5;
+  x.beginPath(); x.moveTo(-1, 9); x.lineTo(9, -1); x.moveTo(-1, 1); x.lineTo(1, -1); x.moveTo(7, 9); x.lineTo(9, 7); x.stroke();
+  return (hatch = ctx.createPattern(c, "repeat"));
+}
+function drawStrip() {
+  const cv = $("#pvStrip"), pv = ed.pv, w = cv.clientWidth;
+  if (!w) return;
+  const rows = pv ? pv.pos.length : 3, rh = 13, gap = 2, h = rows * rh + (rows - 1) * gap + 4;
+  const dpr = window.devicePixelRatio || 1;
+  cv.style.height = h + "px"; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  if (!pv || !pv.n) return;
+  const dur = songDur(ed.draft) || pv.duration, x = (j) => (j / pv.fps / dur) * w;
+  pv.pos.forEach((p, r) => {
+    const y = 2 + r * (rh + gap);
+    for (let j = 0; j < pv.n; ) { // trechos da mesma cor de uma vez
+      const c = p.colors.substr(j * 6, 6); let k = j + 1;
+      while (k < pv.n && p.colors.substr(k * 6, 6) === c) k++;
+      ctx.fillStyle = "#" + c; ctx.fillRect(x(j), y, Math.max(0.6, x(k) - x(j)), rh);
+      j = k;
+    }
+    ctx.fillStyle = hatchPattern(ctx);
+    for (let j = 0; j < pv.n; ) { // strobo e trocas rápidas: listrado, parado
+      if (p.fx[j] === "0") { j++; continue; }
+      let k = j + 1; while (k < pv.n && p.fx[k] !== "0") k++;
+      ctx.fillRect(x(j), y, Math.max(1, x(k) - x(j)), rh);
+      j = k;
+    }
+  });
+}
+new ResizeObserver(() => { if (ed.file) drawStrip(); }).observe($("#pvStrip"));
+
+// Letra transcrita da versão cantada: uma trilha sob a faixa de cores (cada
+// frase no tempo dela) e "Cantando" ao lado do palco.
+function drawLyrics() {
+  const T = ed.draft, lines = (T && T.lyrics) || [], box = $("#pvLyr"), dur = songDur(T);
+  box.hidden = !lines.length || !dur; $("#pvTl").classList.toggle("haslyr", !box.hidden);
+  $("#pvSingKv").hidden = box.hidden;
+  box.innerHTML = ""; ed.lyr = -2;
+  if (box.hidden) return;
+  for (const l of lines) {
+    const i = document.createElement("i");
+    i.style.left = `${(100 * l.t / dur).toFixed(3)}%`; i.style.width = `${(100 * Math.max(0, l.end - l.t) / dur).toFixed(3)}%`;
+    i.title = l.text;
+    box.append(i);
+  }
+}
+function tickLyrics(t) {
+  const lines = (ed.draft && ed.draft.lyrics) || [];
+  if (!lines.length) return;
+  const cur = lines.findIndex((l) => t >= l.t && t < l.end);
+  const next = cur >= 0 ? -1 : lines.findIndex((l) => l.t > t);
+  const key = cur >= 0 ? cur : -10 - next;
+  if (key === ed.lyr) return;
+  ed.lyr = key;
+  [...$("#pvLyr").children].forEach((el, i) => el.classList.toggle("now", i === cur));
+  const b = $("#pvSing");
+  if (cur >= 0) { b.textContent = lines[cur].text; return; }
+  b.textContent = "—";
+  if (next >= 0) { const em = document.createElement("em"); em.textContent = ` · ${mmss(lines[next].t)}: ${lines[next].text}`; b.append(em); }
+}
+
+function pvNote(text, warn) {
+  const n = $("#pvNote");
+  n.classList.toggle("warn", !!warn);
+  if (text) n.textContent = text; else n.innerHTML = "Prévia: o som sai <b>neste aparelho</b> e os canhões não acendem.";
+}
+
+// Atualiza tempo, posição, palco e "luz aqui" (a cada quadro enquanto toca).
+function pvTick(force) {
+  if (!ed.file) return;
+  const p = ed.player, T = ed.draft, t = p ? p.time : 0, dur = songDur(T) || (ed.pv && ed.pv.duration) || 0;
+  const playing = !!p && p.playing;
+  $("#pvTime").textContent = mmss(t); $("#pvDur").textContent = "/ " + mmss(dur);
+  const pb = $("#pvPlay"), st = playing ? "pause" : "play";
+  if (pb.dataset.st !== st) { pb.dataset.st = st; pb.innerHTML = ICON[st]; }
+  const pct = dur ? `${(100 * Math.min(1, t / dur)).toFixed(3)}%` : "0";
+  $("#pvHead").style.left = $("#pvPast").style.width = pct;
+  const i = ed.pv && ed.pv.n ? Math.min(ed.pv.n - 1, Math.floor(t * ed.pv.fps)) : -1;
+  // Strobo/fritação: pisca só tocando, com a opção ligada, a FLASH_HZ por segundo.
+  ed.strobing = playing && pvOpt.flash && i >= 0 && ed.pv.pos.some((p) => +p.fx[i] & 1);
+  const off = ed.strobing && Math.floor(performance.now() * FLASH_HZ * 2 / 1000) % 2 === 1;
+  const key = `${i}:${off}:${ed.strobing}`;
+  if (key !== ed.paint || force) { ed.sample = i; ed.paint = key; paintStage(i, off); }
+  if (!T) return;
+  const sec = T.analysis.sections.find((s) => t >= s.start && t < s.end);
+  const cur = T.cues.filter((c) => c.layer === "base" && c.t <= t).pop(), next = T.cues.find((c) => c.t > t + 0.005);
+  const fl = T.cues.find((c) => c.layer === "flash" && c.t <= t && t < c.t + c.duration);
+  $("#pvSec").textContent = sec ? sec.name || sec.group : "—";
+  $("#pvCue").textContent = fl ? `${cueText(fl)} ⚡` : cur ? cueText(cur) : "—";
+  const nx = $("#pvNext"); nx.textContent = next ? `${layerText(next) === "Luz" ? "" : layerText(next) + ": "}${cueText(next)}` : "—";
+  if (next) { const em = document.createElement("em"); em.textContent = " · " + mmss(next.t); nx.append(em); }
+  followCues($("#meCues"), T.cues, t, ed.follow, force);
+  tickLyrics(t);
+}
+
+// Ouvir com voz: troca o áudio da prévia pela versão cantada, no mesmo ponto.
+$("#pvVoice").onchange = () => {
+  const p = ed.player; if (!p || !ed.file) return;
+  ed.voice = $("#pvVoice").checked;
+  if (DEMO) return; // o modo demonstração não tem som
+  const t = p.time, playing = p.playing, so = mSel && mSel.song;
+  const g = ed.tl && ed.tl.generated, shift = (g && g.voice && g.voice.shift) || 0;
+  p.stop();
+  ed.player = audioPlayer(ed.file, so ? so.duration : songDur(ed.draft), ed.voice, shift);
+  ed.player.seek(t);
+  if (playing) ed.player.play();
+};
+$("#pvPlay").onclick = () => { const p = ed.player; if (!p) return; if (p.playing) p.pause(); else p.play(); pvTick(true); };
+$("#pvStop").onclick = () => { const p = ed.player; if (!p) return; p.pause(); p.seek(0); ed.follow.paused = 0; };
+// Tocar/arrastar na barra ou na faixa de cores leva a prévia até ali.
+{
+  let drag = false;
+  const seekAt = (e) => {
+    const p = ed.player, dur = songDur(ed.draft); if (!p || !dur) return;
+    const r = $("#pvTl").getBoundingClientRect();
+    ed.follow.paused = 0;
+    p.seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur);
+  };
+  $("#pvTl").addEventListener("pointerdown", (e) => { drag = true; e.currentTarget.setPointerCapture(e.pointerId); seekAt(e); });
+  $("#pvTl").addEventListener("pointermove", (e) => { if (drag) seekAt(e); });
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) $("#pvTl").addEventListener(ev, () => { drag = false; });
+}
+
+// ---------- editor ----------
+let edHeadKey = "";
+function renderEdHead() { // chamada a cada mensagem do player: só mexe na tela se mudou
+  const so = mSel && mSel.kind === "song" ? mSel.song : null;
+  const loaded = so && player && player.current === so.index;
+  const sub = so ? [mmss(so.duration), ed.draft ? `${Math.round(ed.draft.analysis.bpm)} BPM` : "", so.genre, so.mood, loaded ? (player.playing ? "tocando no show agora" : "carregada no show") : ""].filter(Boolean).join(" · ") : "";
+  const voice = !!(so && so.voice);
+  const key = [so ? so.title : "", sub, ed.err, voice].join("|");
+  if (key === edHeadKey) return;
+  edHeadKey = key;
+  $("#pvVoiceRow").hidden = !voice;
+  if (!voice && ed.voice) { $("#pvVoice").checked = false; $("#pvVoice").onchange(); } // a versão cantada foi tirada
+  const tg = $("#meTitle"); tg.textContent = so ? so.title : "";
+  if (so) { const sm = document.createElement("small"); sm.textContent = sub; tg.append(sm); }
+  const err = $("#meErr"); err.hidden = !ed.err; err.textContent = ed.err;
+}
+function renderEd() { renderEdHead(); renderEdList(); drawStrip(); pvTick(true); }
+
+function edStatus() {
+  $("#meStatus").textContent = !ed.draft ? "" : !ed.saved ? "salvando…" : ed.edited ? "editada · a versão gerada está guardada" : "";
+  $("#edUndo").disabled = !ed.undo.length;
+  $("#edRevert").disabled = !ed.edited;
+  for (const b of document.querySelectorAll("#mEdit [data-add]")) b.disabled = !ed.draft;
+}
+
+function edChange(fn) {
+  if (!ed.draft) return;
+  ed.undo.push(clone(ed.draft)); if (ed.undo.length > 50) ed.undo.shift();
+  fn();
+  // No mesmo instante, a fritação antes da base (como show.SortCues): ela acontece primeiro.
+  ed.draft.cues.sort((a, b) => a.t - b.t || (a.layer === "flash" ? 0 : 1) - (b.layer === "flash" ? 0 : 1));
+  ed.saved = false;
+  renderEdList(); pvTick(true);
+  clearTimeout(ed.timer);
+  ed.timer = setTimeout(edSave, 600);
+}
+// Salva o rascunho; sem conexão, fica pendente e sai ao reconectar.
+function edSave() {
+  clearTimeout(ed.timer);
+  if (!ed.file || !ed.draft || ed.saved) return;
+  ed.saved = true; // antes de enviar: a resposta (songTimeline) já pode substituir o rascunho
+  if (send({ type: "saveTimeline", str: ed.file, timeline: ed.draft })) ed.edited = true;
+  else ed.saved = false;
+  edStatus();
+}
+
+function presetSelect(cue, src) {
+  const sel = document.createElement("select");
+  const layers = cue.layer === "flash" ? ["flash"] : ["base"];
+  const group = (label, items) => {
+    if (!items.length) return;
+    const og = document.createElement("optgroup"); og.label = label;
+    for (const [value, text] of items) { const o = document.createElement("option"); o.value = value; o.textContent = text; og.append(o); }
+    sel.append(og);
+  };
+  for (const g of config.groups) if (layers.includes(g.layer)) group(g.name, g.buttons.map((b) => [b.preset, b.caption]));
+  if (cue.layer === "base") {
+    group("BIBLIOTECA DE CORES", ((config && config.library) || []).map((b) => [b.preset, b.caption]));
+    const own = new Map();
+    for (const c of src.cues) if (c.preset && c.preset.startsWith("cor:") && !own.has(c.preset)) own.set(c.preset, (c.name || c.preset).replace(/^COR \| /, ""));
+    group("CORES DESTA MÚSICA", [...own]);
+    group("CRIAR", [["__nova", "Nova cor…"]]);
+  }
+  sel.value = cue.preset;
+  if (sel.value !== cue.preset) { const o = document.createElement("option"); o.value = cue.preset; o.textContent = cue.name || cue.preset; sel.prepend(o); sel.value = cue.preset; }
+  return sel;
+}
+
+// Leva a prévia até a troca (um tico depois, para já valer).
+function pvGo(cue) { if (!ed.player) return; ed.follow.paused = 0; ed.player.seek(cue.t + 0.01); }
+
+function renderEdList() {
+  const T = ed.draft, box = $("#meCues");
+  drawTimeline($("#meTl"), T, null); drawRuler($("#meRuler"), songDur(T)); drawLyrics();
+  box.innerHTML = ""; ed.follow.row = -1;
+  const secs = $("#edSecs"); secs.innerHTML = "";
+  edStatus();
+  if (!T) { box.innerHTML = `<p class="hint" style="margin:10px">${ed.err ? "" : "Carregando…"}</p>`; return; }
+  T.cues.forEach((cue) => {
+    const row = document.createElement("div"); row.className = "cue-row";
+    const tb = document.createElement("button"); tb.className = "t"; tb.textContent = fmtT(cue.t); tb.title = "Levar a prévia até esta troca";
+    tb.onclick = () => pvGo(cue);
+    const ly = document.createElement("span"); ly.className = "ly " + cue.layer; ly.textContent = layerText(cue);
+    const what = document.createElement("span"); what.className = "what";
+    if (cue.kind === "blackout") { what.textContent = "tudo apagado"; }
+    else {
+      const sw = document.createElement("i"); sw.className = "sw"; sw.style.background = presetColor(cue.preset);
+      const sel = presetSelect(cue, T);
+      sel.onchange = () => {
+        if (sel.value === "__nova") { sel.value = cue.preset; pickColor(cue); return; }
+        edChange(() => { cue.preset = sel.value; cue.name = ""; if (cue.layer === "base") cue.rate = 0; });
+      };
+      what.append(sw, sel);
+      if (cue.layer === "flash") {
+        const dur = document.createElement("select"); dur.className = "dur"; dur.title = "Duração";
+        const n = Math.max(1, Math.round(cue.duration / beatLen(T)));
+        for (const k of [1, 2, 3, 4, 6, 8]) { const o = document.createElement("option"); o.value = k; o.textContent = `${k} bat.`; dur.append(o); }
+        dur.value = [1, 2, 3, 4, 6, 8].includes(n) ? n : 1;
+        dur.onchange = () => edChange(() => { cue.duration = Math.min(10, +dur.value * beatLen(T)); });
+        what.append(dur);
+      }
+    }
+    if (cue.note) row.title = cue.note;
+    const lq = cue.note && /^letra: (“[^”]*”)/.exec(cue.note); // cor citada na letra
+    if (lq) { const q = document.createElement("span"); q.className = "lyq"; q.textContent = "♪ " + lq[1]; what.append(q); }
+    const acts = document.createElement("span"); acts.className = "acts";
+    const act = (label, title, fn) => { const b = document.createElement("button"); b.className = "small"; b.textContent = label; b.title = title; b.onclick = fn; acts.append(b); };
+    act("◀", "Uma batida antes", () => edChange(() => { cue.t = stepBeat(T, cue.t, -1); }));
+    act("▶", "Uma batida depois", () => edChange(() => { cue.t = stepBeat(T, cue.t, 1); }));
+    act("Aqui", "Levar a prévia até esta troca", () => pvGo(cue));
+    act("Selecionar", "Mover esta troca para o ponto atual da prévia (encaixa na batida)", () => edChange(() => { cue.t = nearestBeat(T, ed.player ? ed.player.time : cue.t); }));
+    act("✕", "Apagar esta troca", () => edChange(() => { T.cues.splice(T.cues.indexOf(cue), 1); }));
+    row.append(tb, ly, what, acts);
+    box.append(row);
+  });
+  if (!T.cues.length) box.innerHTML = `<p class="hint" style="margin:10px">Nenhuma troca de luz. Use os botões acima.</p>`;
+  T.analysis.sections.forEach((sec) => {
+    const r = document.createElement("label"); r.className = "edsec";
+    const t = document.createElement("span"); t.textContent = `${fmtT(sec.start)}–${fmtT(sec.end)}`;
+    const inp = document.createElement("input"); inp.value = sec.name || ""; inp.placeholder = sec.group; inp.maxLength = 40;
+    inp.onchange = () => edChange(() => { sec.name = inp.value.trim(); });
+    r.append(t, inp); secs.append(r);
+  });
+  followCues(box, T.cues, ed.player ? ed.player.time : 0, ed.follow, true);
+}
+
+// Nova cor para uma troca de luz: o seletor de cor do sistema (iPad incluso).
+let colorCue = null;
+function pickColor(cue) {
+  colorCue = cue;
+  const inp = $("#edColor");
+  inp.value = cue.preset && cue.preset.startsWith("cor:") ? cue.preset.slice(4) : "#c8a2c8";
+  inp.click();
+}
+$("#edColor").addEventListener("change", (e) => {
+  const cue = colorCue; colorCue = null;
+  if (!cue || !ed.draft || !ed.draft.cues.includes(cue)) return;
+  edChange(() => { cue.preset = "cor:" + e.target.value.toLowerCase(); cue.name = ""; cue.rate = 0; });
+});
+
+$("#mEdit").addEventListener("click", (e) => {
+  const kind = e.target.closest("[data-add]")?.dataset.add, T = ed.draft; if (!kind || !T) return;
+  const t = nearestBeat(T, ed.player ? ed.player.time : 0);
+  edChange(() => {
+    if (kind === "blackout") T.cues.push({ t, layer: "base", kind: "blackout", note: "" });
+    else if (kind === "flash") {
+      const b = allButtons().find((x) => x.layer === "flash" && x.caption === "BRANCO 254") || allButtons().find((x) => x.layer === "flash");
+      T.cues.push({ t, layer: "flash", kind: "preset", preset: b.preset, name: "", duration: beatLen(T), note: "" });
+    } else {
+      const cur = T.cues.filter((c) => c.layer === "base" && c.kind === "preset" && c.t <= t).pop();
+      const b = cur ? { preset: cur.preset } : allButtons().find((x) => x.layer === "base");
+      T.cues.push({ t, layer: "base", kind: "preset", preset: b.preset, name: "", rate: 0, note: "" });
+    }
+  });
+});
+$("#edUndo").onclick = () => {
+  if (!ed.undo.length) return;
+  ed.draft = ed.undo.pop(); ed.saved = false; renderEdList(); pvTick(true);
+  clearTimeout(ed.timer); ed.timer = setTimeout(edSave, 300);
+};
+$("#edRevert").onclick = () => {
+  if (!confirm("Voltar para a timeline gerada pela análise? Todas as edições desta música serão perdidas.")) return;
+  clearTimeout(ed.timer); ed.saved = true; ed.undo = [];
+  send({ type: "revertTimeline", str: ed.file });
+};
+
+// ---------- eventos e abas ----------
+function addEvent(ev) {
+  const d = document.createElement("div");
+  const t = document.createElement("span"); t.textContent = ev.time;
+  d.append(t, document.createTextNode(ev.text));
+  const list = $("#logList"); list.prepend(d);
+  while (list.children.length > 50) list.lastChild.remove();
+}
+
+// A aba fica no endereço (#manual, #palco...), para salvar atalhos no iPad.
+function showTab(name) {
+  const b = $(`#tabs [data-tab="${name}"]`) || $("#tabs button");
+  for (const x of document.querySelectorAll("#tabs button")) x.classList.toggle("sel", x === b);
+  document.body.dataset.tab = b.dataset.tab;
+  for (const s of document.querySelectorAll("main > section")) s.hidden = s.id !== b.dataset.tab;
+  if (b.dataset.tab !== "musicas" && ed.player && ed.player.playing) ed.player.pause(); // a prévia não toca escondida
+  if (b.dataset.tab === "musicas" && ed.file) { drawStrip(); pvTick(true); }
+}
+$("#tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  history.replaceState(null, "", "#" + b.dataset.tab);
+  showTab(b.dataset.tab);
+});
+window.addEventListener("hashchange", () => { showTab(location.hash.slice(1)); scrollTo(0, 0); });
+// O #aba no endereço faria o navegador rolar até a seção; a aba é que deve abrir no topo.
+window.addEventListener("load", () => scrollTo(0, 0));
+showTab(location.hash.slice(1));
+
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("luzes-tema", t); } catch {}
+  for (const b of $("#themeSw").children) b.classList.toggle("sel", b.dataset.set === t);
+  document.querySelector('meta[name="theme-color"]').content = t === "dark" ? "#0d0d0f" : "#f6f5f2";
+  if (timeline) { renderTimeline(); tick(); }
+  if (ed.file) { drawTimeline($("#meTl"), ed.draft, null); drawRuler($("#meRuler"), songDur(ed.draft)); pvTick(true); }
+}
+$("#themeSw").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setTheme(b.dataset.set); });
+setTheme(document.documentElement.dataset.theme);
+
+connect();
+</script>
+</body>
+</html>

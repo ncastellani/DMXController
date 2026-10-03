@@ -1,0 +1,19 @@
+Device F3:E3:2F:9B:A2:B4 (public)
+	Name: MONDIAL CM
+	Alias: MONDIAL CM
+	Class: 0x00340404 (3408900)
+	Icon: audio-headset
+	Paired: yes
+	Bonded: yes
+	Trusted: yes
+	Blocked: no
+	Connected: yes
+	LegacyPairing: no
+	CablePairing: no
+	UUID: Audio Sink                (0000110b-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: PnP Information           (00001200-0000-1000-8000-00805f9b34fb)
+	Modalias: bluetooth:v05D6p000Ad0240
+	ManufacturerData.Key: 0x5754 (22356)
+	ManufacturerData.Value:
+  53 4a 4c aa 58                                   SJL.X           

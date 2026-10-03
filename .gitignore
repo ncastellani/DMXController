@@ -1,0 +1,19 @@
+# Segredos (copie .env.example para .env)
+.env
+
+# Binários (go build -o bin/ ./cmd/...)
+bin/
+
+# Material de uso local: músicas (áudio, timelines, letras), sobras e testes
+musicas/
+tmp/
+
+# Preferências de som desta máquina (gravadas pela interface)
+config/som-*.yaml
+
+# Kit do Claude Design: gerado por scripts/kit_design.py (o brief.md fica)
+design/luzes-demo.html
+design/prints/
+
+# go build sem -o gera o binário na raiz
+/luzes

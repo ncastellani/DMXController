@@ -1,0 +1,12 @@
+# Endereço inicial de cada canhão. Tem que bater com o display do aparelho
+# (menu "dXXX": d001, d008, d015).
+fixtures:
+  - name: esquerda
+    profile: mm-t114-7ch
+    address: 1
+  - name: centro
+    profile: mm-t114-7ch
+    address: 8
+  - name: direita
+    profile: mm-t114-7ch
+    address: 15

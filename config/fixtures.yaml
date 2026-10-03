@@ -1,0 +1,15 @@
+# Perfis de fixtures: função de cada canal, na ordem a partir do endereço inicial.
+profiles:
+  mm-t114-7ch:
+    name: Mini Men MM-T114 (modo 7 canais, conforme manual)
+    channels:
+      - dimmer # 1: master (linear)
+      - red    # 2
+      - green  # 3
+      - blue   # 4
+      - empty  # 5: "Empty" no manual
+      - mode   # 6: 0-50 strobo/dimmer | 51-100 jump | 101-150 gradiente | 151-200 pulso | 201-255 som
+      - speed  # 7: velocidade da função do canal 6 (lenta → rápida)
+    fixed:
+      mode: 0  # cores controladas pelos canais 1-4
+      speed: 0 # a confirmar na aba Manual: no modo 0-50 deve ser a velocidade do strobo
