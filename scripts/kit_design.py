@@ -22,12 +22,15 @@ STATIC = ROOT / "internal" / "web" / "static"
 OUT = ROOT / "design"
 
 TABS = ["show", "console", "musicas", "manual", "palco", "som", "log"]
-# Prints extras: aba, script rodado numa cópia temporária da página (o
+# Prints extras (o editor parado no "verde-limão" da versão cantada; sem as
+# transições de cor do palco, que não andam no tempo virtual do print): aba,
+# script rodado numa cópia temporária da página (o
 # luzes-demo.html entregue não muda) e tamanhos (no celular o editor fica
 # abaixo da lista, fora do print).
 EXTRAS = {
-    "musicas-editor": ("musicas", 'setTimeout(() => { document.querySelector("#mSongs .opt").click();'
-                       ' setTimeout(() => ed.player.seek(95), 300); }, 800);', ("computador", "ipad")),
+    "musicas-editor": ("musicas", 'document.head.insertAdjacentHTML("beforeend", "<style>*{transition:none!important}</style>");'
+                       ' setTimeout(() => { document.querySelector("#mSongs .opt").click();'
+                       ' setTimeout(() => ed.player.seek(42.6), 300); }, 800);', ("computador", "ipad")),
 }
 SIZES = {"computador": (1440, 900), "ipad": (1180, 820), "celular": (390, 844)}
 

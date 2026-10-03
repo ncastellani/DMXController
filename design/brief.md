@@ -47,7 +47,7 @@ todas as abas em computador, iPad e celular estão em `prints/`.
    Strobe contínuo (4, liga/desliga). Atalhos de teclado no computador.
 3. **Músicas** (preparação, usada mais no computador) — à esquerda, a lista
    das músicas da pasta (com etiquetas: IA ou regras, cores quentes/frias,
-   letra, editada; arquivos ainda "sem timeline") e a fila de análise etapa
+   versão cantada ou letra, editada; arquivos ainda "sem timeline") e a fila de análise etapa
    por etapa. Tocar numa música abre à direita a **prévia e o editor da luz**
    dela (sem carregá-la no show):
    - **Palco 2D**, em duas vistas da plateia: **"Pendurados"** (padrão;
@@ -60,11 +60,16 @@ todas as abas em computador, iPad e celular estão em `prints/`.
      ("Piscar strobo e fritação", dá para desligar).
    - Play/pausa/voltar ao início da **prévia** (o som sai no próprio
      aparelho, não na caixa do show; os canhões não acendem), tempo, parte,
-     "luz aqui" e a próxima troca.
+     "luz aqui", a próxima troca e, se a música tem versão cantada,
+     **"Cantando"** (a frase da letra naquele instante, ou a próxima) e a
+     opção **"Ouvir com voz"** (a prévia toca a versão cantada para conferir
+     as cores na palavra).
    - Barra da música (como na aba Show) e, colada embaixo, a **faixa de
      cores**: uma trilha fina por canhão com a cor ao longo da música;
      trechos de strobo/troca rápida em listrado parado. Tocar ou arrastar
      na barra/faixa leva a prévia até ali; um cursor único atravessa as duas.
+     Com versão cantada, uma **trilha da letra** fina embaixo: um bloco por
+     frase cantada, a atual destacada.
    - **Editor**: lista das trocas de luz (horário, tipo Luz/Fritação/Apagar,
      preset, duração da fritação em batidas, ◀ ▶ uma batida, "Aqui" = leva a
      prévia até a troca, "Selecionar" = move a troca para o ponto atual da
@@ -74,12 +79,16 @@ todas as abas em computador, iPad e celular estão em `prints/`.
      mais escuras, a atual em amarelo, as que vêm em cor normal (vale também
      para a lista da aba Show). O preset de uma troca de "Luz"
      pode ser também uma cor da biblioteca, uma cor criada para a música ou
-     "Nova cor…" (seletor de cor do sistema).
+     "Nova cor…" (seletor de cor do sistema). A troca que veio de uma cor
+     citada na letra mostra o trecho embaixo ("♪ “teu vestido verde-limão”").
    - "Analisar de novo…" troca o editor pelo formulário de análise.
    O formulário serve para **enviar .wav novos** (tocar ou arrastar) ou
    **analisar de novo** uma música: temperatura das cores (Automático /
-   Quentes / Frias), "Usar IA" e a **letra** colada (opcional; a IA casa a
-   letra com as partes e acende as cores citadas). Aviso quando a reanálise
+   Quentes / Frias), "Usar IA", a **versão cantada** (opcional: um segundo
+   .wav, a mesma faixa com a voz; a IA transcreve a letra e acende as cores
+   citadas na palavra; mostra "guardada ✓" com Trocar/Tirar ao analisar de
+   novo) e a **letra** colada (opcional; ajuda a transcrição ou, sem versão
+   cantada, a IA casa a letra com as partes). Aviso quando a reanálise
    apaga edições. Nunca mostrar o nome do modelo de IA.
 4. **Manual** — para cada canhão, 7 controles deslizantes (dimmer, R, G, B,
    vazio, função, velocidade) que mostram o valor ao vivo e, ao mexer, fixam o

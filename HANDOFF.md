@@ -2,66 +2,75 @@
 
 Leia junto com o `CLAUDE.md` (arquitetura e regras) e o `README.md` (o que o
 programa faz). Este arquivo guarda só o estado atual e os roteiros das
-próximas sessões. Última atualização: 02/10/2026 (fim da 4ª sessão).
+próximas sessões. Última atualização: 02/10/2026 (fim da 5ª sessão).
 
 ## Estado atual
 
-Tudo do README está pronto e testado no Linux. A 4ª sessão fez a **Sessão B
-— prévia 2D e editor na aba Músicas**:
+Tudo do README está pronto e testado no Linux. A 5ª sessão fez a **Sessão A
+— versão cantada para acertar o tempo das cores**:
 
-- **Editar qualquer música sem carregá-la no show**: tocar numa música da
-  aba Músicas abre o editor (lista de trocas, Selecionar, cores, Nova cor…,
-  Desfazer, Restaurar gerada, nomes das partes). `saveTimeline` e
-  `revertTimeline` aceitam `str` = o `X.json`; a resposta é a mensagem nova
-  `songTimeline` para todos os navegadores. Se a música está carregada (ou
-  já emendada no fluxo), a edição vale na hora (`Show.Update(path, t)`).
-  Edição feita sem conexão fica pendente e sai ao reconectar.
-- **Prévia**: `GET /api/preview` compila o `Program` e lê cada canhão com
-  `Look` (`show.RenderPreview`, 10 amostras/s; ~55 KB e 3 ms por música).
-  Na página, **palco 2D** (treliça, 3 canhões com facho e poça de luz) e
-  **faixa de cores** com uma trilha por canhão sob a barra da música; um
-  cursor único, tocar/arrastar pula.
-- **Segurança**: onde a cor troca mais de 3×/s (CLUB, BATIDÃO, FLASH,
-  IMPACTO, SURTO QUENTE, VERMELHO BRANCO 2, CAOS QUENTE, BRANCO VERMELHO), o
-  servidor manda a cor média com a marca "troca rápida"; strobo nativo
-  (fritações e strobos) vem marcado. Os dois aparecem parados, com ícone
-  (⚡ / ≋) no palco e listrado na faixa. Medido no navegador: ≤ 1,3 troca
-  forte/s na prévia do CLUB.
-- **Ouvir no aparelho**: `GET /api/audio` (WAV com Range) num `<audio>`; a
-  prévia pausa ao sair da aba. Sem áudio (modo demonstração ou navegador
-  que não toca), segue um relógio sem som.
-- Pedidos da usuária no fim da sessão: palco 2D com duas vistas
-  ("Pendurados", o padrão, e "No chão": esquerda mira à direita, direita à
-  esquerda, centro para a plateia); strobo/fritação **piscam na prévia**
-  a 2,9×/s no máximo, só tocando, com opção de desligar (o console ao vivo
-  continua sem piscar); trocas que já passaram ficam mais escuras nas
-  listas; "Marcar" virou "Selecionar"; a análise **enumera as partes que
-  se repetem** ("verso 1", "refrão 2"; trechos vizinhos com o mesmo nome
-  levam o mesmo número; nomes únicos como "intro" ficam sem número). As
-  músicas já analisadas só ganham os números ao analisar de novo. A lista
-  da aba Show ganhou "Aqui" (leva o show até a troca) e as barras da música
-  (Show e Músicas), uma régua de tempo. A mira vem da posição (pontas
-  cruzam, meio para a frente), não de configuração.
-- **Aba Show só exibe** a lista de trocas (acompanhando a música);
-  "Editar" leva ao editor da aba Músicas com a música carregada.
-- `demo.js`, `PROTOCOLO.md`, `design/brief.md`, README e CLAUDE.md
-  atualizados; o kit do Claude Design ganhou prints do editor
-  (`computador-musicas-editor.png`, `ipad-musicas-editor.png`).
-- Testes: `show.TestPreview` e `web.TestEditSongNotLoaded` (endpoints,
-  edição de música não carregada, Range, 404 fora da setlist).
+- **Envio**: na aba Músicas, o formulário ganhou "Versão cantada
+  (opcional)": um segundo `.wav`, a mesma faixa com a voz, gravado como
+  `X.voz.wav` (`POST /api/upload?name=X.wav&voz=1`; "Trocar"/"Tirar" ao
+  analisar de novo, `analyze` com `noVoice`). O show nunca toca esse arquivo;
+  ele não aparece como música nova. `luzes analisar` usa `X.voz.wav` sozinho.
+- **Isolar a voz** (`analysis/vocals.go`): GCC-PHAT alinha as versões (até
+  ±5 s; outra música dá placar < 10, a mesma faixa > 100 → limiar 30, senão
+  a cantada é ignorada com aviso); subtração espectral por banda (ganho do
+  quantil baixo, máximo dos quadros vizinhos) → energia da voz → **frases
+  cantadas** (lacuna < 0,35 s junta, < 0,3 s sai, > 12 s divide no ponto mais
+  fraco). Subtração no tempo a 44,1 kHz (atraso refinado na taxa original)
+  dá a voz limpa quando o resíduo nos trechos sem voz fica 20 dB abaixo
+  (mediana por quadro); senão a IA ouve a cantada inteira.
+- **Transcrição** (`analysis/lyrics.go`): uma chamada com **um áudio por
+  frase**; a IA devolve o texto e as cores citadas com o segundo da palavra.
+  A letra colada continua opcional e vira referência para a transcrição
+  (decisão da usuária: "manter como ajuda"); sem versão cantada, ela segue
+  o caminho antigo (casar com as partes).
+- **Coreografia**: as partes sempre ganham uma sequência; as cores citadas
+  vêm em `cores_citadas` (cena fixa da biblioteca de qualquer temperatura ou
+  `cor:` nova). `placeColors`: a cor acende na batida da palavra (no início
+  da parte, se cair a menos de 1 batida dele; a troca da parte sai), fica até
+  o fim da frase, **2 a 4 compassos** (decisão da usuária: "alguns
+  compassos"), e a sequência da parte volta ("volta depois da cor"); a parte
+  seguinte, se vier antes, assume; cores a < 2 batidas da anterior saem.
+  Sem versão cantada (só letra colada): início da parte, 4 compassos.
+- **Timeline**: `lyrics: [{t, end, text}]` e `generated.voice {shift,
+  clean, phrases}`; o editor nunca muda a letra (vem da versão gravada).
+- **Editor**: trilha da letra (um bloco por frase) sob a faixa de cores,
+  "Cantando" ao lado do palco, "♪ “trecho”" na troca que veio da letra e
+  **"Ouvir com voz"** (`/api/audio?voz=1`, descontando `voice.shift`).
+- Testado de ponta a ponta com a IA de verdade, num par montado em
+  `tmp/voz/` (playback de praficarcomigo + trechos de "Crimson & Clover" em
+  instantes conhecidos, 37 ms de atraso; também com outro "master"): atraso
+  exato, frases batendo com os trechos, "Crimson" → BORDÔ/VERMELHO
+  PROFUNDO na batida da palavra. Pela página: envio da versão cantada +
+  análise + editor (prints em computador e iPad, modo demonstração sem
+  erros). ~US$ 0,004 a transcrição + ~US$ 0,02 a coreografia; ~50 s por
+  música no PC.
+- Testes novos: `TestIsolateVoice` (sintético: atraso de meia amostra,
+  frases, faixa diferente recusada), `TestPhrasesSplitLong`,
+  `TestSungColors`, `TestLyricsColors` (reescrito), `web.TestUploadVoice`.
+- O Claude Design **não está mais em uso**: só rodar `scripts/kit_design.py`
+  se ela pedir (o `design/brief.md` foi atualizado antes do aviso).
 
-Não testado: a prévia com som no **iPad/Safari** (o WAV deveria tocar; se
-não tocar, a prévia anda sem som e avisa). **O primeiro commit ainda não
-foi feito** (`git init` feito na 3ª sessão).
+Sessões anteriores: B (4ª) = prévia 2D com duas vistas, faixa de cores,
+editor de qualquer música na aba Músicas, Show só leitura, partes
+enumeradas; antes disso, DMX, console, player, aba Músicas, luz apagada por
+padrão.
+
+**Não testado**: com uma versão cantada **real** (voz de verdade sobre o
+mesmo playback): a detecção de frases foi afinada com o par de teste;
+frases muito ligadas podem virar uma só (até 12 s) e backing vocals do
+playback não aparecem (estão nas duas versões). "Ouvir com voz" e a prévia
+com som no **iPad/Safari**. **O primeiro commit ainda não foi feito**.
 
 ## Pendências pequenas
 
-- **Pergunta em aberto para a usuária**: hoje a cor citada na letra vale a
-  **parte inteira** (ex.: refrão de 60 s todo em lilás parado). Alternativa:
-  a cor por 2–4 compassos e depois a sequência de pista da parte. A Sessão A
-  muda isso de qualquer forma (a cor passa a entrar na hora do verso).
-- Colar as letras reais e refazer `praficarcomigo.json` pela aba Músicas. O
-  atual ainda é do script Python antigo (BPM 123,05; o real é 126).
+- Enviar a **versão cantada** de `praficarcomigo` (e das outras) e refazer
+  pela aba Músicas; conferir com "Ouvir com voz" se as cores caem na
+  palavra. O `praficarcomigo.json` atual ainda é do script Python antigo
+  (BPM 123,05; o real é 126).
 - Sugerir ao Amós 2–3 **sequências frias agitadas** no QLC+ (hoje só há o
   CLUB).
 - Em aberto no equipamento (do HANDOVER do Amós): CH6 = 50 está na fronteira
@@ -74,34 +83,8 @@ foi feito** (`git init` feito na 3ª sessão).
 
 ## Próximas sessões (uma por chat)
 
-A Sessão B está feita (acima). Ordem sugerida: **C** (usa o editor da B);
-**A** é independente; **D** quando o Pi chegar.
-
-### Sessão A — versão cantada para acertar o tempo das cores
-
-Pedido: enviar, além do playback, a mesma faixa **com o Amós cantando** (mesma
-duração e mesmo tempo), para que a análise saiba **em que segundo** cada verso
-é cantado. Exemplo: o "verde-limão" de *Doce* (Jão) acender na palavra, não
-no começo da parte.
-
-- Guardar como `X.voz.wav` ao lado de `X.wav` (o show continua tocando só o
-  playback). Na aba Músicas, um segundo campo de arquivo opcional: "Versão
-  cantada".
-- Conferir o encaixe: mesma taxa e duração (±50 ms); estimar o deslocamento
-  por correlação cruzada entre as duas versões e corrigir se for pequeno.
-- **Isolar a voz por subtração**: como o instrumental é idêntico,
-  `voz = cantada − playback` dá a voz quase limpa (só funciona se for a mesma
-  mixagem/master; se o resíduo ficar alto, cair para o plano B).
-- Detectar as frases cantadas (energia da voz isolada → inícios e fins) e
-  mandar ao LLM a letra + a lista de frases com tempo (e o áudio da voz) para
-  ele casar **linha da letra ↔ instante**. Plano B: mandar a versão cantada
-  inteira ao LLM e pedir os tempos de cada linha.
-- A cor citada entra no instante da palavra/linha, encaixada na batida. A
-  duração dela (até o fim da frase? alguns compassos?) é a pergunta em
-  aberto acima.
-- Guardar os tempos das linhas na timeline (ex.: `analysis.lyrics: [{t,
-  line}]`) para o editor da aba Músicas mostrar a letra junto das trocas
-  (ex.: uma trilha de letra sob a faixa de cores).
+As Sessões A e B estão feitas (acima). Ordem sugerida: **C** (usa o editor
+da B e a letra transcrita da A); **D** quando o Pi chegar.
 
 ### Sessão C — ajuste fino com IA (para o Amós)
 
@@ -117,7 +100,7 @@ Pedido: depois de gerada, o Amós ajusta cada música conversando com a IA
   - a timeline atual (cues, partes, resumo da análise; não o vetor inteiro de
     batidas);
   - o catálogo de presets com temperatura;
-  - a letra e o pedido.
+  - a letra (a transcrita, com os tempos, se houver versão cantada) e o pedido.
 - O LLM devolve **operações** em JSON (adicionar, remover ou alterar trocas;
   renomear partes), não um arquivo livre.
 - Validar com as mesmas regras da análise (presets existentes, cores

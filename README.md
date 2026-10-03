@@ -27,15 +27,23 @@ algo no QLC+, basta copiar o `.qxw` novo para `config/`.
   parada, tudo fica preto. Só acende com a música tocando ou com um preset
   manual.
 - **Músicas**: enviar `.wav` e analisar (ou analisar de novo) com
-  **temperatura das cores** (automática, quentes, frias), IA opcional e a
-  **letra** colada. Quando a letra cita uma cor, a IA acende essa cor no
-  começo da parte, criando a cor se ela não existir.
+  **temperatura das cores** (automática, quentes, frias) e IA opcional.
+- **Versão cantada** (opcional): junto do playback, envie a mesma faixa
+  **com a voz**. O programa alinha as duas, isola a voz e acha as frases
+  cantadas; a IA transcreve a letra e, quando ela cita uma cor
+  ("verde-limão"), a cor acende **na palavra** (encaixada na batida) por
+  alguns compassos, criando a cor se ela não existir, e depois volta a
+  sequência da parte. No show toca só o playback. A letra colada continua
+  opcional: ajuda a IA a acertar as palavras (sem a versão cantada, a cor
+  citada acende no começo da parte).
 - **Prévia e editor da luz** (aba Músicas): escolha qualquer música, sem
   carregá-la no show, e ouça no próprio aparelho com o **palco 2D** (os 3
   canhões acendendo) e a **faixa de cores** de cada canhão sob a barra da
   música. Edite as trocas de luz, fritações e apagões encaixados na batida,
   com cores da biblioteca ou criadas na hora, desfazer e restaurar a versão
-  gerada. Duas vistas do palco: pendurados (padrão) e **no chão, como no
+  gerada. Com a versão cantada, a letra aparece numa trilha sob a faixa de
+  cores e em "Cantando", e dá para **ouvir com voz** para conferir as cores
+  na palavra. Duas vistas do palco: pendurados (padrão) e **no chão, como no
   show** (os das pontas cruzando, o do centro para a plateia). A prévia não acende os
   canhões; strobo e fritação piscam nela no máximo 3 vezes por segundo
   (dá para desligar), e as trocas rápidas de cor aparecem pela média.
@@ -107,8 +115,8 @@ sistema bloquear o binário, rode `xattr -d com.apple.quarantine bin/darwin-arm6
 O `luzes` não tem interface no terminal: todo o controle e o log ficam na
 página. Ctrl+C apaga os canhões e encerra.
 
-**Preparar o show**: na aba **Músicas**, envie os `.wav` (cole a letra se
-quiser), toque em cada música e confira a luz na prévia (o som sai no
+**Preparar o show**: na aba **Músicas**, envie os `.wav` (com a versão
+cantada, se tiver), toque em cada música e confira a luz na prévia (o som sai no
 computador ou iPad, não na caixa), ajustando no editor. Em **Posições**, confirme a ordem dos
 canhões ("Identificar"). Em **Som**, escolha a saída e calibre o atraso.
 Para testar a interface DMX e descobrir canais, use "Identificar" e a aba
@@ -121,6 +129,9 @@ criar presets novos):
 ./bin/luzes analisar musicas/      # -sem-ia, -forcar (refaz as existentes), -temperatura quente|fria
 ```
 
+Para usar a versão cantada pela linha de comando, deixe `X.voz.wav` ao lado
+de `X.wav` (e, se quiser, a letra em `X.letra.txt`).
+
 ## Arquivos
 
 | Caminho | O que é | No git? |
@@ -131,7 +142,7 @@ criar presets novos):
 | `config/fixtures.yaml`, `config/patch.yaml` | perfil dos canhões e endereços (o patch é regravado ao trocar posições) | sim |
 | `config/aniversario_STROBE.qxw` | workspace do QLC+ do Amós (de onde vêm os presets) | sim |
 | `config/som-<sistema>.yaml` | preferências de som desta máquina (atraso, volume, caixa) | não |
-| `musicas/` | `X.wav` + timeline `X.json` (+ `X.json.orig` se editada, `X.letra.txt`) e a ordem em `setlist.txt` | não (áudio e conteúdo do show) |
+| `musicas/` | `X.wav` + timeline `X.json` (+ `X.voz.wav` versão cantada, `X.json.orig` se editada, `X.letra.txt`) e a ordem em `setlist.txt` | não (áudio e conteúdo do show) |
 | `tmp/` | sobras e testes locais | não |
 | `.env` | `OPENROUTER_API_KEY` | não |
 | `*.md`, `design/` | documentação (abaixo) | sim, menos o kit gerado em `design/` |
@@ -143,7 +154,7 @@ lá.
 ## Documentação
 
 - [TIMELINE.md](TIMELINE.md): formato do JSON de cada música,
-  presets, temperatura e letra.
+  presets, temperatura, versão cantada e letra.
 - [PROTOCOLO.md](PROTOCOLO.md): o contrato entre o servidor
   e a página (WebSocket e HTTP).
 - [design/brief.md](design/brief.md): briefing para redesenhar a
