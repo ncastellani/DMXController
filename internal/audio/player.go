@@ -31,7 +31,7 @@ type Player struct {
 	pl      *oto.Player
 	src     *source
 	volume  float64
-	latency time.Duration // atraso extra da saída (ex.: Bluetooth), calibrado
+	latency time.Duration // atraso extra da saída (ex.: Bluetooth), calibrado; negativo adianta a luz
 }
 
 // NewPlayer abre a saída de som padrão do sistema. Só pode existir um.
@@ -157,7 +157,8 @@ func (p *Player) Playing() bool {
 }
 
 // Position é a posição do fluxo que está saindo na caixa agora: o que já
-// foi lido, menos o que ainda está em buffer e o atraso da saída.
+// foi lido, menos o que ainda está em buffer e o atraso da saída. Com atraso
+// negativo (o som chega antes da luz) a posição anda à frente.
 func (p *Player) Position() time.Duration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -188,11 +189,12 @@ func (p *Player) Volume() float64 {
 	return p.volume
 }
 
-// SetLatency define o atraso extra da saída de som (calibração).
+// SetLatency define o atraso extra da saída de som (calibração). Negativo
+// adianta a luz: é para quando o som sai antes dela.
 func (p *Player) SetLatency(d time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.latency = max(0, d)
+	p.latency = d
 }
 
 // Latency devolve o atraso extra configurado.

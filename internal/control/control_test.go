@@ -10,7 +10,7 @@ import (
 	"github.com/ncastellani/DMXController/internal/dmx"
 	"github.com/ncastellani/DMXController/internal/engine"
 	"github.com/ncastellani/DMXController/internal/fixture"
-	"github.com/ncastellani/DMXController/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/library"
 
 	"gopkg.in/yaml.v3"
 )
@@ -67,7 +67,7 @@ func out(eng *engine.Engine, now time.Time) byte {
 }
 
 func TestLoadShowConsole(t *testing.T) {
-	c, err := LoadConsole("../../config/console.yaml")
+	c, err := LoadConsole("../../config/console.yaml", Positions(testRig(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,11 +82,11 @@ func TestLoadShowConsole(t *testing.T) {
 
 func TestBuildErrors(t *testing.T) {
 	for _, tt := range []struct{ yaml, want string }{
-		{`groups: [{name: X, layer: base, buttons: [{caption: A, function: 999}]}]`, "não existe"},
+		{`groups: [{name: X, layer: base, buttons: [{caption: A, preset: "todos:nada"}]}]`, "não existe"},
 		{`groups: [{name: X, layer: foo, buttons: []}]`, "layer"},
-		{`groups: [{name: X, layer: base, buttons: [{caption: A, function: 0, key: b}]}]`, "reservada"},
-		{`groups: [{name: X, layer: base, buttons: [{caption: A, function: 0, key: ab}]}]`, "inválida"},
-		{`groups: [{name: X, layer: base, buttons: [{caption: A, function: 0, key: a}, {caption: B, function: 0, key: a}]}]`, "já usada"},
+		{`groups: [{name: X, layer: base, buttons: [{caption: A, preset: "todos:s", key: b}]}]`, "reservada"},
+		{`groups: [{name: X, layer: base, buttons: [{caption: A, preset: "todos:s", key: ab}]}]`, "inválida"},
+		{`groups: [{name: X, layer: base, buttons: [{caption: A, preset: "todos:s", key: a}, {caption: B, preset: "todos:s", key: a}]}]`, "já usada"},
 	} {
 		_, err := buildFromYAML(t, tt.yaml)
 		if err == nil || !strings.Contains(err.Error(), tt.want) {
@@ -102,8 +102,11 @@ func buildFromYAML(t *testing.T, groups string) (*Console, error) {
 	if err := yaml.Unmarshal([]byte(src), &cf); err != nil {
 		t.Fatal(err)
 	}
-	ws := &qlc.Workspace{Scenes: map[int]*qlc.Scene{0: {Name: "S"}}}
-	return build(&cf, ws)
+	lib := &library.Library{Colors: []library.Color{{ID: "todos:s", Name: "S", Hex: "#ff0000", Alias: "qlc:0"}}}
+	if err := lib.Check(); err != nil {
+		t.Fatal(err)
+	}
+	return build(&cf, lib, nil)
 }
 
 func frame(eng *engine.Engine, now time.Time) dmx.Frame {

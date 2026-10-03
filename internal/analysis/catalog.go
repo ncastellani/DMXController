@@ -3,18 +3,18 @@ package analysis
 import (
 	"fmt"
 	"math"
-	"slices"
 	"strings"
 
 	"github.com/ncastellani/DMXController/internal/control"
-	"github.com/ncastellani/DMXController/internal/dmx"
 	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/library"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // Preset descreve um botão do console para as escolhas do coreógrafo.
 type Preset struct {
-	ID       string   // "qlc:<Function ID>"
-	Name     string   // nome da Function no QLC+
+	ID       string   // id na biblioteca ("pista:club")
+	Name     string   // nome de exibição ("PISTA | CLUB")
 	Caption  string   // legenda do botão
 	Group    string   // grupo no console
 	Layer    string   // base | strobe | flash
@@ -25,7 +25,7 @@ type Preset struct {
 	Fade     bool     // a sequência tem fades
 	Temp     string   // temperatura das cores: quente | fria | mista | neutra
 	Hex      string   // cor das cenas de cor fixa ("#rrggbb")
-	Library  bool     // cor "TODOS | X" do workspace que não está nos botões
+	Library  bool     // cor fixa da biblioteca que não está nos botões
 }
 
 // Temperaturas pedidas na análise (Options.Temperature).
@@ -85,160 +85,64 @@ func (p Preset) Fits(temp string) bool {
 	return true
 }
 
-// Catalog descreve os botões do console. positions são os fixtures de cada
-// posição com endereço lógico (o quadro dos presets).
-func Catalog(c *control.Console, positions []*fixture.Fixture) []Preset {
-	ws := c.Workspace
-	look := func(f *dmx.Frame) (cols []fixture.Color, strobe bool) {
-		for _, p := range positions {
-			col, st := p.Look(f)
-			cols = append(cols, col)
-			strobe = strobe || st
+// Catalog descreve os presets para as escolhas do coreógrafo: os botões do
+// console e, como "biblioteca de cores", as cores fixas que não são botões.
+func Catalog(c *control.Console) []Preset {
+	lib := c.Library
+	// A cor nomeada mais parecida (para dizer de que cor é um strobo).
+	colorName := func(t library.Tone) string {
+		rgb := func(t library.Tone) (r, g, b, m float64) {
+			c, _ := show.ParseColor(t.Hex())
+			return float64(c.R), float64(c.G), float64(c.B), float64(max(c.R, c.G, c.B))
 		}
-		return cols, strobe
-	}
-
-	// Paleta nomeada: as cores fixas "TODOS | X" (cor do primeiro canhão).
-	type named struct {
-		name string
-		c    fixture.Color
-	}
-	var palette []named
-	for _, sc := range ws.Scenes {
-		if rest, ok := strings.CutPrefix(sc.Name, "TODOS |"); ok {
-			var f dmx.Frame
-			sc.Render(0, &f)
-			if cols, _ := look(&f); len(cols) > 0 && max(cols[0].R, cols[0].G, cols[0].B) > 0 {
-				palette = append(palette, named{strings.TrimSpace(rest), cols[0]})
-			}
-		}
-	}
-	slices.SortFunc(palette, func(a, b named) int { return strings.Compare(a.name, b.name) })
-	colorName := func(c fixture.Color) string {
-		m := float64(max(c.R, c.G, c.B))
-		if m < 30 {
-			return "apagado"
-		}
+		r, g, b, m := rgb(t)
 		best, bd := "", math.Inf(1)
-		for _, p := range palette {
-			pm := float64(max(p.c.R, p.c.G, p.c.B))
-			d := sq(float64(c.R)/m-float64(p.c.R)/pm) + sq(float64(c.G)/m-float64(p.c.G)/pm) + sq(float64(c.B)/m-float64(p.c.B)/pm)
-			if d < bd {
-				best, bd = p.name, d
+		for _, pc := range lib.Colors {
+			pt, _ := library.ParseTone(pc.Hex)
+			pr, pg, pb, pm := rgb(pt)
+			if d := sq(r/m-pr/pm) + sq(g/m-pg/pm) + sq(b/m-pb/pm); d < bd {
+				best, bd = pc.Name, d
 			}
 		}
 		return best
 	}
+	color := func(p *Preset, name string, t library.Tone) {
+		p.Kind, p.Agitacao, p.Colors, p.Hex = "cena", "fixa", []string{name}, t.Hex()
+		p.Temp = presetTemp(map[string]int{name: 1})
+	}
 
 	var presets []Preset
-	scores := map[string]float64{}
-	inConsole := map[int]bool{}
+	inConsole := map[string]bool{}
 	for _, b := range c.Buttons {
-		inConsole[b.Function] = true
-		p := Preset{ID: fmt.Sprintf("qlc:%d", b.Function), Name: b.Name, Caption: b.Caption, Group: b.Group, Layer: b.Layer.String()}
-		colors := map[string]int{}
-		if seq, ok := ws.Sequences[b.Function]; ok {
-			p.Kind = "sequencia"
+		inConsole[b.Preset] = true
+		p := Preset{ID: b.Preset, Name: b.Name, Caption: b.Caption, Group: b.Group, Layer: b.Layer.String()}
+		if e := lib.Effect(b.Preset); e != nil {
 			var durs []float64
-			dark, total := 0, 0
-			for _, st := range seq.Steps {
+			for _, st := range e.Parsed() {
 				durs = append(durs, float64(st.Duration.Milliseconds()))
-				p.Fade = p.Fade || st.FadeIn > 0
-				var f dmx.Frame
-				for _, v := range st.Values {
-					f.Set(v.Channel, v.Value)
-				}
-				cols, _ := look(&f)
-				for _, col := range cols {
-					total++
-					if n := colorName(col); n == "apagado" {
-						dark++
-					} else {
-						colors[n]++
-					}
-				}
 			}
-			p.StepMs = medianF(durs)
-			darkRatio := float64(dark) / float64(max(total, 1))
-			score := math.Log(1000/math.Max(p.StepMs, 1)) + 1.5*darkRatio
-			if p.Fade {
-				score -= 0.8
-			}
-			scores[p.ID] = score
-		} else {
-			p.Kind = "cena"
-			var f dmx.Frame
-			b.Src.Render(0, &f)
-			cols, strobe := look(&f)
-			own, isColor := strings.CutPrefix(b.Name, "TODOS |")
-			for _, col := range cols {
-				if isColor { // a cena de cor fixa tem o nome da própria cor
-					colors[strings.TrimSpace(own)]++
-				} else {
-					colors[colorName(col)]++
-				}
-			}
-			if len(cols) > 0 && !strobe {
-				p.Hex = hexOf(cols[0])
-			}
-			p.Agitacao = "fixa"
-			if strobe {
-				p.Agitacao = "strobo"
-			}
+			p.Kind, p.Colors, p.Agitacao, p.Temp, p.StepMs, p.Fade = "sequencia", e.Colors, e.Agitacao, e.Temp, medianF(durs), e.Fades()
+		} else if col := lib.Color(b.Preset); col != nil {
+			t, _ := library.ParseTone(col.Hex)
+			color(&p, col.Name, t)
+		} else if st := lib.Strobe(b.Preset); st != nil {
+			t, _ := library.ParseTone(st.Hex)
+			color(&p, colorName(t), t)
+			p.Agitacao, p.Hex = "strobo", ""
 		}
-		for n := range colors {
-			p.Colors = append(p.Colors, n)
-		}
-		slices.Sort(p.Colors)
-		p.Temp = presetTemp(colors)
 		presets = append(presets, p)
 	}
-
-	// Biblioteca: as cores fixas do workspace que não viraram botão
-	// (ex.: VERDE LIMÃO), para a IA usar quando a letra citar a cor.
-	var ids []int
-	for id, sc := range ws.Scenes {
-		if strings.HasPrefix(sc.Name, "TODOS |") && !inConsole[id] {
-			ids = append(ids, id)
+	// Biblioteca de cores: as cores fixas que não viraram botão (ex.: VERDE
+	// LIMÃO), para a análise e o editor.
+	for i := range lib.Colors {
+		col := &lib.Colors[i]
+		if inConsole[col.ID] {
+			continue
 		}
-	}
-	slices.SortFunc(ids, func(a, b int) int { return strings.Compare(ws.Scenes[a].Name, ws.Scenes[b].Name) })
-	for _, id := range ids {
-		sc := ws.Scenes[id]
-		var f dmx.Frame
-		sc.Render(0, &f)
-		cols, _ := look(&f)
-		if len(cols) == 0 || max(cols[0].R, cols[0].G, cols[0].B) == 0 {
-			continue // TODOS | BLACKOUT
-		}
-		name := strings.TrimSpace(strings.TrimPrefix(sc.Name, "TODOS |"))
-		presets = append(presets, Preset{
-			ID: fmt.Sprintf("qlc:%d", id), Name: sc.Name, Caption: name, Group: "BIBLIOTECA DE CORES",
-			Layer: "base", Kind: "cena", Agitacao: "fixa", Colors: []string{name},
-			Temp: presetTemp(map[string]int{name: 1}), Hex: hexOf(cols[0]), Library: true,
-		})
-	}
-
-	// Agitação das sequências em terços (calma / média / agitada).
-	var sorted []float64
-	for _, s := range scores {
-		sorted = append(sorted, s)
-	}
-	slices.Sort(sorted)
-	if len(sorted) > 0 {
-		lo, hi := sorted[len(sorted)/3], sorted[2*len(sorted)/3]
-		for i := range presets {
-			if s, ok := scores[presets[i].ID]; ok {
-				switch {
-				case s < lo:
-					presets[i].Agitacao = "calma"
-				case s < hi:
-					presets[i].Agitacao = "media"
-				default:
-					presets[i].Agitacao = "agitada"
-				}
-			}
-		}
+		t, _ := library.ParseTone(col.Hex)
+		p := Preset{ID: col.ID, Name: col.FullName(), Caption: col.Name, Group: "BIBLIOTECA DE CORES", Layer: "base", Library: true}
+		color(&p, col.Name, t)
+		presets = append(presets, p)
 	}
 	return presets
 }

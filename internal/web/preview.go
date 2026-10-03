@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/ncastellani/DMXController/internal/analysis"
 	"github.com/ncastellani/DMXController/internal/fixture"
 	"github.com/ncastellani/DMXController/internal/show"
 )
@@ -48,6 +47,7 @@ func (s *Server) serveTimeline(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
+	s.show.Compile(t) // ids antigos de preset ("qlc:43") chegam ao editor já como os da biblioteca
 	writeJSON(w, songTimelineMsg{Type: "songTimeline", File: so.File, Timeline: t, Edited: exists(so.JSON + ".orig")})
 }
 
@@ -114,18 +114,13 @@ func (s *Server) servePreview(w http.ResponseWriter, r *http.Request) {
 
 // serveAudio entrega o .wav de uma música para tocar no navegador (a
 // prévia; o show toca pela saída de som do programa):
-// GET /api/audio?file=X.json (&voz=1: a versão cantada). Aceita Range (pular
-// na música).
+// GET /api/audio?file=X.json. Aceita Range (pular na música).
 func (s *Server) serveAudio(w http.ResponseWriter, r *http.Request) {
 	so, ok := s.song(w, r)
 	if !ok {
 		return
 	}
-	path := so.WAV
-	if r.URL.Query().Get("voz") == "1" {
-		path = analysis.VoicePath(so.WAV)
-	}
-	f, err := os.Open(path)
+	f, err := os.Open(so.WAV)
 	if err != nil {
 		http.Error(w, "áudio não encontrado", http.StatusNotFound)
 		return
@@ -138,5 +133,5 @@ func (s *Server) serveAudio(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "audio/wav")
 	w.Header().Set("Cache-Control", "no-cache") // a faixa pode ser substituída
-	http.ServeContent(w, r, filepath.Base(path), st.ModTime(), f)
+	http.ServeContent(w, r, filepath.Base(so.WAV), st.ModTime(), f)
 }

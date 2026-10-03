@@ -29,7 +29,8 @@ type Song struct {
 	Mood     string
 	Temp     string        // temperatura das cores pedida na análise
 	AI       bool          // a timeline foi gerada com IA
-	Sung     int           // frases da letra transcrita (versão cantada)
+	Free     bool          // gerada no modo livre (efeitos criados para a música)
+	Mix      bool          // gerada no modo misto (presets e efeitos combinados)
 	Err      string        // problema encontrado ao listar
 	Link     bool          // ao terminar, emenda com a próxima
 	Gap      time.Duration // intervalo até a próxima, se emendada
@@ -145,9 +146,12 @@ func (s *Show) Scan() error {
 			var gen struct {
 				Temperature string `json:"temperature"`
 				Model       string `json:"model"`
+				Free        bool   `json:"free"`
+				Mix         bool   `json:"mix"`
 			}
 			json.Unmarshal(t.Generated, &gen)
-			song.Temp, song.AI, song.Sung = gen.Temperature, gen.Model != "", len(t.Lyrics)
+			song.Temp, song.AI, song.Free = gen.Temperature, gen.Model != "", gen.Free
+			song.Mix = gen.Mix
 			if _, err := os.Stat(song.WAV); err != nil {
 				song.Err = "áudio não encontrado: " + t.Song.File
 			}
@@ -269,6 +273,58 @@ func (s *Show) SetLink(file string, on bool, gap time.Duration) error {
 	}
 	s.requeue()
 	return nil
+}
+
+// Remove tira a música file (X.json) da setlist: da ordem e das emendas
+// (setlist.txt). Tocando, é recusada; carregada (parada ou pausada), é
+// descarregada antes. move tira os arquivos dela da pasta (ex.: para a
+// lixeira) antes de reler a setlist e refazer a emenda da música atual —
+// assim ela não chega a ser emendada no meio do caminho.
+func (s *Show) Remove(file string, move func(Song) error) error {
+	song, ok := s.Song(file)
+	if !ok {
+		return fmt.Errorf("música %q não está na setlist", file)
+	}
+	if s.Current() == song.JSON {
+		if s.head.playing() {
+			return fmt.Errorf("%s está tocando: pare a música antes de remover", song.Title)
+		}
+		s.unload()
+	}
+	var files []string
+	for _, so := range s.Songs() {
+		if so.File != file {
+			files = append(files, so.File)
+		}
+	}
+	s.mu.Lock()
+	links := map[string]time.Duration{}
+	for k, v := range s.links {
+		if k != file {
+			links[k] = v
+		}
+	}
+	s.mu.Unlock()
+	if err := s.writeOrder(files, links); err != nil {
+		return err
+	}
+	moveErr := move(song)
+	if err := s.Scan(); err != nil {
+		return err
+	}
+	s.requeue()
+	return moveErr
+}
+
+// unload descarrega a música atual (fica nada carregado, luz do show fora).
+func (s *Show) unload() {
+	s.head.pause()
+	s.eng.Stop(engine.Show)
+	s.head.unload()
+	s.mu.Lock()
+	s.cur, s.tl, s.prog, s.cal, s.queued = -1, nil, nil, false, ""
+	s.gen++
+	s.mu.Unlock()
 }
 
 // Songs devolve a setlist.
@@ -676,6 +732,16 @@ func (h *playhead) load(t *audio.Track, seg pseg) {
 	h.mu.Lock()
 	seg.start = 0
 	h.segs, h.running, h.base = []pseg{seg}, false, 0
+	h.mu.Unlock()
+}
+
+// unload esvazia o fluxo.
+func (h *playhead) unload() {
+	if h.player != nil {
+		h.player.Load(&audio.Track{})
+	}
+	h.mu.Lock()
+	h.segs, h.running, h.base = nil, false, 0
 	h.mu.Unlock()
 }
 

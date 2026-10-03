@@ -14,8 +14,8 @@ func TestPreview(t *testing.T) {
 	}
 	p, err := Compile(timeline(
 		Cue{T: 0, Layer: "base", Kind: "preset", Preset: "cor:#ff0000"},
-		Cue{T: 6, Layer: "flash", Kind: "preset", Preset: "qlc:100", Duration: 1}, // FRITAÇÃO | BRANCO (strobo nativo)
-		Cue{T: 10, Layer: "base", Kind: "preset", Preset: "qlc:55"},               // PISTA | FLASH: pisca rápido
+		Cue{T: 6, Layer: "flash", Kind: "preset", Preset: "fritacao:branco", Duration: 1}, // FRITAÇÃO | BRANCO (strobo nativo)
+		Cue{T: 10, Layer: "base", Kind: "preset", Preset: "pista:flash"},                  // PISTA | FLASH: pisca rápido
 		Cue{T: 16, Layer: "base", Kind: "blackout"},
 	), NewPresets(workspace(t), fixtures), 10*time.Second)
 	if err != nil {

@@ -22,7 +22,7 @@ func addSong(t *testing.T, dir, name string) {
 		tl.Analysis.Beats = append(tl.Analysis.Beats, b)
 	}
 	tl.Analysis.Sections = []show.Section{{Start: 0, End: 10, Group: "A", Name: "verso"}, {Start: 10, End: 20, Group: "B", Name: "refrão"}}
-	tl.Cues = []show.Cue{{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:30", Rate: 1}}
+	tl.Cues = []show.Cue{{T: 0, Layer: "base", Kind: "preset", Preset: "pista:azul-rosa", Rate: 1}}
 	data, _ := json.Marshal(tl)
 	os.WriteFile(filepath.Join(dir, name+".json"), data, 0o644)
 	os.WriteFile(filepath.Join(dir, name+".wav"), nil, 0o644)
@@ -71,8 +71,8 @@ func TestSaveAndRevertTimeline(t *testing.T) {
 	data, _ := json.Marshal(edited)
 	json.Unmarshal(data, &e)
 	e.Cues = []show.Cue{
-		{T: 12.25, Layer: "flash", Kind: "preset", Preset: "qlc:100", Duration: 99}, // fora de ordem, duração enorme
-		{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:41", Rate: 0},            // preset trocado: reencaixa
+		{T: 12.25, Layer: "flash", Kind: "preset", Preset: "fritacao:branco", Duration: 99}, // fora de ordem, duração enorme
+		{T: 0, Layer: "base", Kind: "preset", Preset: "pista:pop", Rate: 0},                 // preset trocado: reencaixa
 		{T: 15, Layer: "base", Kind: "blackout"},
 	}
 	e.Analysis.Sections[1].Name = "Refrão final"
@@ -86,13 +86,13 @@ func TestSaveAndRevertTimeline(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := saved.Cues
-	if c[0].Preset != "qlc:41" || c[0].Rate <= 0 || c[0].Rate == 1 || c[0].Name != "PISTA | POP" {
+	if c[0].Preset != "pista:pop" || c[0].Rate <= 0 || c[0].Rate == 1 || c[0].Name != "PISTA | POP" {
 		t.Fatalf("cue de base: %+v", c[0])
 	}
 	if c[1].Layer != "flash" || c[1].Duration != 10 || saved.Analysis.BPM != 120 || saved.Analysis.Sections[1].Name != "Refrão final" {
 		t.Fatalf("salvo: %+v %+v", c, saved.Analysis.Sections)
 	}
-	if got := sh.Timeline().Cues[0].Preset; got != "qlc:41" {
+	if got := sh.Timeline().Cues[0].Preset; got != "pista:pop" {
 		t.Fatalf("a luz deveria seguir a edição na hora: %s", got)
 	}
 	if b, _ := os.ReadFile(path + ".orig"); string(b) != string(orig) {
@@ -100,11 +100,11 @@ func TestSaveAndRevertTimeline(t *testing.T) {
 	}
 
 	// Preset inválido: recusa e não mexe no arquivo.
-	bad := strings.Replace(string(raw), `"qlc:41"`, `"qlc:9999"`, 1)
+	bad := strings.Replace(string(raw), `"pista:pop"`, `"qlc:9999"`, 1)
 	if err := srv.saveTimeline("", json.RawMessage(bad)); err == nil {
 		t.Fatal("preset inexistente deveria ser recusado")
 	}
-	if again, _ := show.LoadTimeline(path); again.Cues[0].Preset != "qlc:41" {
+	if again, _ := show.LoadTimeline(path); again.Cues[0].Preset != "pista:pop" {
 		t.Fatal("arquivo não deveria mudar")
 	}
 
@@ -114,7 +114,7 @@ func TestSaveAndRevertTimeline(t *testing.T) {
 	if b, _ := os.ReadFile(path); string(b) != string(orig) || exists(path+".orig") {
 		t.Fatal("restaurar deveria voltar ao original e apagar o .orig")
 	}
-	if sh.Timeline().Cues[0].Preset != "qlc:30" {
+	if sh.Timeline().Cues[0].Preset != "pista:azul-rosa" {
 		t.Fatal("a luz deveria voltar à versão gerada")
 	}
 }
@@ -161,7 +161,7 @@ func TestEditSongNotLoaded(t *testing.T) {
 	if saved, _ := show.LoadTimeline(filepath.Join(dir, "b.json")); saved.Cues[0].Preset != "cor:#00ff00" || saved.Cues[0].Name != "COR | #00ff00" {
 		t.Fatalf("b salva: %+v", saved.Cues)
 	}
-	if !exists(filepath.Join(dir, "b.json.orig")) || sh.Timeline().Song.Title != "a" || sh.Timeline().Cues[0].Preset != "qlc:30" {
+	if !exists(filepath.Join(dir, "b.json.orig")) || sh.Timeline().Song.Title != "a" || sh.Timeline().Cues[0].Preset != "pista:azul-rosa" {
 		t.Fatal("editar b não deveria mexer na música carregada")
 	}
 
@@ -191,7 +191,7 @@ func TestEditSongNotLoaded(t *testing.T) {
 	if err := srv.revertTimeline("b.json"); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := show.LoadTimeline(filepath.Join(dir, "b.json")); again.Cues[0].Preset != "qlc:30" || exists(filepath.Join(dir, "b.json.orig")) {
+	if again, _ := show.LoadTimeline(filepath.Join(dir, "b.json")); again.Cues[0].Preset != "pista:azul-rosa" || exists(filepath.Join(dir, "b.json.orig")) {
 		t.Fatal("restaurar deveria voltar à versão gerada")
 	}
 }

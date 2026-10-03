@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -81,25 +82,22 @@ func wavBytes(d time.Duration) []byte {
 // newImportServer monta o servidor com envio de músicas numa pasta temporária.
 func newImportServer(t *testing.T) (*Server, *show.Show, string, *httptest.Server) {
 	t.Helper()
-	c, err := control.LoadConsole("../../config/console.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
 	fixtures, _ := fixture.Load("../../config/fixtures.yaml", "../../config/patch.yaml")
-	rig, err := control.NewRig(fixtures, c, filepath.Join(t.TempDir(), "patch.yaml"))
+	rig, err := control.NewRig(fixtures, filepath.Join(t.TempDir(), "patch.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var pos []*fixture.Fixture
-	for i := range rig.Fixtures {
-		pos = append(pos, rig.Logical(i))
+	pos := control.Positions(rig)
+	c, err := control.LoadConsole("../../config/console.yaml", pos)
+	if err != nil {
+		t.Fatal(err)
 	}
 	eng := &engine.Engine{}
 	ctl := control.NewController(c, eng, rig)
 	dir := t.TempDir()
-	sh := show.New(dir, show.NewPresets(c.Workspace, pos), eng, nil, c.Limits.Flash, ctl.Notice)
+	sh := show.New(dir, show.NewPresets(c.Library, pos), eng, nil, c.Limits.Flash, ctl.Notice)
 	srv := New(ctl, eng, sh, nil, nil, nil, "")
-	srv.SetImporter(&Importer{Dir: dir, Catalog: analysis.Catalog(c, pos)})
+	srv.SetImporter(&Importer{Dir: dir, Catalog: analysis.Catalog(c), Library: c.Library})
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	go srv.Run(ctx)
@@ -178,8 +176,10 @@ func TestUpload(t *testing.T) {
 	}
 }
 
-func TestAnalyzeWithLyrics(t *testing.T) {
-	srv, sh, dir, hs := newImportServer(t)
+// TestAnalyzeStored: a faixa enviada sem análise fica como órfã até a
+// mensagem analyze; a reanálise da música carregada vale na hora.
+func TestAnalyzeStored(t *testing.T) {
+	srv, sh, _, hs := newImportServer(t)
 	resp, err := http.Post(hs.URL+"/api/upload?name=Balada.wav&analisar=0", "audio/wav", bytes.NewReader(wavBytes(12*time.Second)))
 	if err != nil || resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("envio: %v %v", resp, err)
@@ -197,35 +197,22 @@ func TestAnalyzeWithLyrics(t *testing.T) {
 
 	waitJobs := func(n int) job { t.Helper(); return waitJob(t, srv, n) }
 	c := &client{id: "teste"}
-	letra := "Teu vestido verde-limão\r\nbrilhando no salão"
-	if err := srv.handle(c, &inMsg{Type: "analyze", Str: "Balada.wav", Temp: "fria", AI: true, Lyrics: &letra}, time.Now()); err != nil {
+	if err := srv.handle(c, &inMsg{Type: "analyze", Str: "Balada.wav", Temp: "fria", AI: true}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	j := waitJobs(1)
-	if j.Error != "" || j.Temp != "fria" || j.AI || j.Lyrics { // sem chave: sem IA, e a letra fica só guardada
+	if j.Error != "" || j.Temp != "fria" || j.AI { // sem chave: sem IA
 		t.Fatalf("job: %+v", j)
-	}
-	got, _ := os.ReadFile(filepath.Join(dir, "Balada.letra.txt"))
-	if string(got) != "Teu vestido verde-limão\nbrilhando no salão\n" {
-		t.Fatalf("letra guardada: %q", got)
-	}
-	resp, _ = http.Get(hs.URL + "/api/lyrics?file=Balada.wav")
-	body := new(bytes.Buffer)
-	body.ReadFrom(resp.Body)
-	resp.Body.Close()
-	if body.String() != string(got) {
-		t.Fatalf("GET letra: %q", body)
 	}
 	sl := srv.setlist()
 	if len(sl.Songs) != 1 || len(sl.Orphans) != 0 {
 		t.Fatalf("setlist: %+v", sl)
 	}
-	if so := sl.Songs[0]; so.WAV != "Balada.wav" || !so.Lyrics || so.Temp != "fria" || so.AI || so.Edited {
+	if so := sl.Songs[0]; so.WAV != "Balada.wav" || so.Temp != "fria" || so.AI || so.Edited {
 		t.Fatalf("música: %+v", so)
 	}
 
-	// Reanálise da música carregada: a timeline nova vale na hora; letra nil
-	// mantém a guardada, "" apaga.
+	// Reanálise da música carregada: a timeline nova vale na hora.
 	if err := sh.Load(0); err != nil {
 		t.Fatal(err)
 	}
@@ -237,15 +224,6 @@ func TestAnalyzeWithLyrics(t *testing.T) {
 	if sh.Timeline() == before || !strings.Contains(string(sh.Timeline().Generated), `"temperature":"quente"`) {
 		t.Fatalf("a música carregada não recebeu a timeline nova: %s", sh.Timeline().Generated)
 	}
-	if !exists(filepath.Join(dir, "Balada.letra.txt")) {
-		t.Fatal("letra nil não deveria apagar")
-	}
-	vazia := ""
-	srv.handle(c, &inMsg{Type: "analyze", Str: "Balada.wav", Lyrics: &vazia}, time.Now())
-	waitJobs(3)
-	if exists(filepath.Join(dir, "Balada.letra.txt")) {
-		t.Fatal("letra vazia deveria apagar o arquivo")
-	}
 	if err := srv.handle(c, &inMsg{Type: "analyze", Str: "naoexiste.wav"}, time.Now()); err == nil {
 		t.Fatal("faixa inexistente deveria falhar")
 	}
@@ -254,66 +232,109 @@ func TestAnalyzeWithLyrics(t *testing.T) {
 	}
 }
 
-// TestUploadVoice: a versão cantada vira X.voz.wav, não aparece como música
-// nova, toca na prévia com voz=1 e sai com noVoice.
-func TestUploadVoice(t *testing.T) {
-	srv, _, dir, hs := newImportServer(t)
-	post := func(query string) int {
-		resp, err := http.Post(hs.URL+"/api/upload?"+query, "audio/wav", bytes.NewReader(wavBytes(3*time.Second)))
-		if err != nil {
+// TestRemoveSong: a música sai da setlist (e do setlist.txt) e os arquivos
+// dela vão para a lixeira; faixa sem timeline também; tocando, é recusada.
+func TestRemoveSong(t *testing.T) {
+	srv, sh, dir, _ := newImportServer(t)
+	for _, name := range []string{"A.wav", "B.wav", "C.wav"} {
+		os.WriteFile(filepath.Join(dir, name), wavBytes(3*time.Second), 0o644)
+		if err := srv.analyze(name, false, "", false, false); err != nil {
 			t.Fatal(err)
 		}
-		resp.Body.Close()
-		return resp.StatusCode
 	}
-	if c := post("name=Doce.wav&voz=1"); c != http.StatusBadRequest {
-		t.Fatalf("versão cantada sem o playback: %d", c)
-	}
-	if c := post("name=Doce.voz.wav&analisar=0"); c != http.StatusBadRequest {
-		t.Fatalf("playback com nome de versão cantada: %d", c)
-	}
-	if c := post("name=Doce.wav&analisar=0"); c != http.StatusAccepted {
-		t.Fatalf("playback: %d", c)
-	}
-	if c := post("name=Doce.wav&voz=1"); c != http.StatusAccepted {
-		t.Fatalf("versão cantada: %d", c)
-	}
-	if c := post("name=Doce.wav&voz=1"); c != http.StatusAccepted { // troca a anterior
-		t.Fatalf("versão cantada de novo: %d", c)
-	}
-	if !exists(filepath.Join(dir, "Doce.voz.wav")) {
-		t.Fatal("Doce.voz.wav não foi gravado")
-	}
-	if m := srv.setlist(); len(m.Orphans) != 1 || m.Orphans[0] != "Doce.wav" {
-		t.Fatalf("órfãs: %v", m.Orphans)
-	}
-
-	// Com a timeline (só regras: sem chave), a setlist mostra a versão cantada
-	// e a prévia a toca.
-	if err := srv.analyze("Doce.wav", true, "", nil, false); err != nil {
+	waitJob(t, srv, 3)
+	os.WriteFile(filepath.Join(dir, "B.json.orig"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(dir, "Nova.wav"), wavBytes(time.Second), 0o644)
+	if err := sh.Reorder([]string{"C.json", "B.json", "A.json"}); err != nil {
 		t.Fatal(err)
 	}
-	if j := waitJob(t, srv, 1); j.Error != "" || j.Voice { // sem chave: sem IA, a versão cantada não entra
-		t.Fatalf("análise: %+v", j)
+	if err := sh.SetLink("B.json", true, time.Second); err != nil {
+		t.Fatal(err)
 	}
-	m := srv.setlist()
-	if len(m.Songs) != 1 || !m.Songs[0].Voice || len(m.Orphans) != 0 {
-		t.Fatalf("setlist: %+v", m)
-	}
-	resp, err := http.Get(hs.URL + "/api/audio?file=Doce.json&voz=1")
+
+	where, err := srv.removeSong("B.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "audio/wav" {
-		t.Fatalf("áudio com voz: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	for _, f := range []string{"B.json", "B.json.orig", "B.wav"} {
+		if exists(filepath.Join(dir, f)) || !exists(filepath.Join(dir, where, f)) {
+			t.Errorf("%s não foi para a lixeira (%s)", f, where)
+		}
+	}
+	var got []string
+	for _, so := range sh.Songs() {
+		got = append(got, so.File)
+	}
+	order, _ := os.ReadFile(filepath.Join(dir, show.OrderFile))
+	if strings.Join(got, ",") != "C.json,A.json" || strings.Contains(string(order), "B.json") {
+		t.Fatalf("setlist %v, setlist.txt:\n%s", got, order)
 	}
 
-	if err := srv.analyze("Doce.wav", false, "", nil, true); err != nil {
+	// Faixa sem timeline; o áudio de uma música não sai sozinho.
+	if _, err := srv.removeSong("Nova.wav"); err != nil || exists(filepath.Join(dir, "Nova.wav")) {
+		t.Fatalf("faixa sem timeline: %v", err)
+	}
+	if _, err := srv.removeSong("A.wav"); err == nil {
+		t.Fatal("removeu o áudio de uma música da setlist")
+	}
+	if _, err := srv.removeSong("X.json"); err == nil {
+		t.Fatal("removeu uma música que não existe")
+	}
+
+	// Carregada e tocando: recusa; parada: descarrega e remove.
+	if err := sh.Load(0); err != nil {
 		t.Fatal(err)
 	}
-	waitJob(t, srv, 2)
-	if exists(filepath.Join(dir, "Doce.voz.wav")) || srv.setlist().Songs[0].Voice {
-		t.Fatal("noVoice não apagou a versão cantada")
+	sh.Play()
+	if _, err := srv.removeSong("C.json"); err == nil || !exists(filepath.Join(dir, "C.json")) {
+		t.Fatalf("removeu a música tocando: %v", err)
+	}
+	sh.Pause()
+	if _, err := srv.removeSong("C.json"); err != nil {
+		t.Fatal(err)
+	}
+	if st := sh.Status(); st.Current != -1 || sh.Timeline() != nil || len(sh.Songs()) != 1 {
+		t.Fatalf("depois de remover a carregada: %+v", st)
+	}
+}
+
+// TestFreeMode: a análise no modo livre gera efeitos (aqui pelas regras), a
+// setlist lembra a opção e o editor troca o efeito, recusando o inválido.
+func TestFreeMode(t *testing.T) {
+	srv, sh, dir, _ := newImportServer(t)
+	os.WriteFile(filepath.Join(dir, "L.wav"), wavBytes(3*time.Second), 0o644)
+	if err := srv.analyze("L.wav", false, "fria", true, false); err != nil {
+		t.Fatal(err)
+	}
+	waitJob(t, srv, 1)
+	path := filepath.Join(dir, "L.json")
+	tl, err := show.LoadTimeline(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tl.Cues[0]
+	if c.Kind != "effect" || c.Effect == nil || c.Preset != "" || !strings.HasPrefix(c.Name, "EFEITO | ") { // pelas regras: um modo de pista frio da biblioteca, como efeito
+		t.Fatalf("troca gerada: %+v", c)
+	}
+	if songs := srv.setlist().Songs; len(songs) != 1 || !songs[0].Free || songs[0].Temp != "fria" {
+		t.Fatalf("setlist: %+v", songs)
+	}
+	if _, err := sh.Compile(tl); err != nil {
+		t.Fatal(err)
+	}
+
+	tl.Cues[0].Name, tl.Cues[0].Rate = "", 3
+	tl.Cues[0].Effect = &show.Effect{Type: show.FXChase, Colors: []string{"#FF00AA", "#0000ff", "#00ff00"}, Beats: 3}
+	raw, _ := json.Marshal(tl)
+	if err := srv.saveTimeline("L.json", raw); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := show.LoadTimeline(path)
+	if c := saved.Cues[0]; c.Name != "LIVRE | CORRIDA" || c.Rate != 0 || len(c.Effect.Colors) != 2 || c.Effect.Colors[0] != "#ff00aa" || c.Effect.Beats != 4 {
+		t.Fatalf("efeito salvo: %+v %+v", c, c.Effect)
+	}
+	bad := strings.Replace(string(raw), `"chase"`, `"laser"`, 1)
+	if err := srv.saveTimeline("L.json", json.RawMessage(bad)); err == nil {
+		t.Fatal("efeito desconhecido deveria ser recusado")
 	}
 }

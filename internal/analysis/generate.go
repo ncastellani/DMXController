@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/library"
 	"github.com/ncastellani/DMXController/internal/show"
 )
 
@@ -18,13 +20,12 @@ type Options struct {
 	APIKey      string             // vazio: só regras
 	Model       string             // modelo do OpenRouter (padrão DefaultModel)
 	Temperature string             // TempAuto (ou ""), TempWarm, TempCold
-	Lyrics      string             // letra colada (só a IA usa; com a versão cantada, ajuda a transcrever)
-	Voice       string             // versão cantada (X.voz.wav); vazio = sem
+	Free        bool               // modo livre: efeitos criados para a música (a IA pode pôr um preset onde servir melhor)
+	Mixed       bool               // modo misto: presets e efeitos combinados, cada um em pelo menos um terço das partes
+	Library     *library.Library   // biblioteca: modos de pista e cores para o modo livre (pode ser nil)
+	Separator   *Separator         // ouvido de bateria: separa a bateria da música para ouvir a batida nela (pode ser nil)
 	Progress    func(stage string) // etapas, para mostrar na interface
 }
-
-// MaxLyrics é o tamanho máximo da letra (em caracteres) mandada à IA.
-const MaxLyrics = 8000
 
 // NormTemp devolve a temperatura válida mais próxima de t (TempAuto se não
 // reconhecer).
@@ -53,47 +54,30 @@ func Generate(ctx context.Context, wavPath string, cat []Preset, opt Options) (t
 		return nil, "", err
 	}
 	y := Mono(track)
+	var warns []string
+	var drums []float64
+	if opt.Separator != nil { // sem o ouvido, ou se ele falhar, a batida é estimada na música inteira
+		progress("separando a bateria")
+		path, err := opt.Separator.Drums(ctx, wavPath, progress)
+		if err == nil {
+			var dt *audio.Track
+			if dt, err = audio.LoadWAV(path); err == nil {
+				drums = Mono(dt)
+			}
+		}
+		if err != nil {
+			warns = append(warns, "sem o ouvido de bateria nesta análise: "+err.Error())
+		}
+	}
 	progress("analisando batidas e partes")
-	a := Analyze(y)
+	a := AnalyzeDrums(y, drums)
 	temp := opt.temp()
-	lyrics := trunc(strings.TrimSpace(opt.Lyrics), MaxLyrics)
-	fallback := ruleChoices(&a, cat, temp)
 	model := opt.Model
 	if model == "" {
 		model = DefaultModel
 	}
-	p := prompt{model: model, key: opt.APIKey, temp: temp, lyrics: lyrics}
-	var warns []string
-	extra := map[string]any{}
-
-	// Versão cantada: a voz isolada diz quando cada frase é cantada, e a IA
-	// transcreve a letra.
-	if opt.Voice != "" {
-		progress("alinhando a versão cantada")
-		v, err := loadVoice(track, y, opt.Voice)
-		switch {
-		case err != nil:
-			warns = append(warns, "versão cantada ignorada: "+err.Error())
-		case len(v.Phrases) == 0:
-			warns = append(warns, "não achei voz na versão cantada (ela é igual ao playback?)")
-		case opt.APIKey == "":
-			warns = append(warns, "a letra da versão cantada precisa da IA")
-		default:
-			extra["voice"] = map[string]any{"shift": round(v.Shift, 3), "clean": v.Clean, "phrases": len(v.Phrases)}
-			if v.Note != "" {
-				warns = append(warns, v.Note)
-			}
-			progress(fmt.Sprintf("a IA está transcrevendo a letra (%d frases)", len(v.Phrases)))
-			s, usage, err := transcribe(ctx, v, lyrics, p)
-			if err != nil {
-				warns = append(warns, "não deu para transcrever a letra: "+err.Error())
-				break
-			}
-			p.sung = s
-			progress(fmt.Sprintf("letra transcrita: %d frases, %d cores citadas (%s)", len(s.Lines), len(s.Colors), usage))
-		}
-	}
-
+	free := opt.Free || opt.Mixed
+	p := prompt{model: model, key: opt.APIKey, temp: temp, free: free, mixed: opt.Mixed, lib: opt.Library}
 	var llm *choices
 	if opt.APIKey != "" {
 		progress("a IA está ouvindo a música")
@@ -108,30 +92,28 @@ func Generate(ctx context.Context, wavPath string, cat []Preset, opt Options) (t
 	if llm == nil {
 		model = ""
 	}
-	secs, accents := validate(llm, &a, cat, fallback, temp)
-	colors := validateColors(llm, &a, cat, p.sung)
-	title := strings.TrimSuffix(filepath.Base(wavPath), filepath.Ext(wavPath))
-	opt.Temperature, opt.Lyrics = temp, lyrics
-	return build(title, filepath.Base(wavPath), a, cat, secs, accents, colors, p.sung, llm, model, opt, extra), strings.Join(warns, "; "), nil
-}
-
-// loadVoice lê a versão cantada e isola a voz no tempo do playback (y é
-// ele em Mono).
-func loadVoice(play *audio.Track, y []float64, path string) (*voice, error) {
-	sung, err := audio.LoadWAV(path)
-	if err != nil {
-		return nil, err
+	fallback := ruleChoices(&a, cat, temp)
+	presets := slices.Clone(fallback.Sections) // as partes só com presets
+	if free {
+		var song *Mood // o clima que a IA ouviu orienta também as partes que ficam com as regras
+		if llm != nil && llm.Score != nil {
+			llm.Score.Clamp()
+			song = llm.Score
+		}
+		ruleEffects(&a, temp, fallback.Sections, opt.Library, song)
 	}
-	return isolateVoice(play, sung, y)
+	effects := slices.Clone(fallback.Sections) // as partes só com efeitos
+	if opt.Mixed {
+		mixByEnergy(&a, fallback.Sections, presets)
+	}
+	secs, accents := validate(llm, &a, cat, fallback, temp, free, opt.Library)
+	if opt.Mixed {
+		balance(&a, secs, presets, effects)
+	}
+	title := strings.TrimSuffix(filepath.Base(wavPath), filepath.Ext(wavPath))
+	opt.Temperature = temp
+	return build(title, filepath.Base(wavPath), a, cat, secs, accents, llm, model, opt), strings.Join(warns, "; "), nil
 }
-
-// VoicePath é onde fica a versão cantada de X.wav (X.voz.wav).
-func VoicePath(wav string) string {
-	return strings.TrimSuffix(wav, filepath.Ext(wav)) + VoiceSuffix
-}
-
-// VoiceSuffix termina o nome da versão cantada.
-const VoiceSuffix = ".voz.wav"
 
 // Save grava a timeline em path (UTF-8 legível, gravação atômica).
 func Save(t *show.Timeline, path string) error {

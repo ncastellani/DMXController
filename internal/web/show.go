@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ncastellani/DMXController/internal/analysis"
 	"github.com/ncastellani/DMXController/internal/show"
 	"github.com/ncastellani/DMXController/internal/sound"
 )
@@ -19,7 +18,6 @@ type setlistMsg struct {
 	Dir     string    `json:"dir"`
 	Songs   []songMsg `json:"songs"`
 	Orphans []string  `json:"orphans"` // .wav da pasta ainda sem timeline
-	Voices  []string  `json:"voices"`  // órfãs que já têm a versão cantada
 }
 
 type songMsg struct {
@@ -35,9 +33,8 @@ type songMsg struct {
 	WAV      string  `json:"wav,omitempty"` // arquivo de áudio (para reanalisar)
 	Temp     string  `json:"temp,omitempty"`
 	AI       bool    `json:"ai"`     // gerada com IA
-	Lyrics   bool    `json:"lyrics"` // há letra guardada (X.letra.txt)
-	Voice    bool    `json:"voice"`  // há versão cantada (X.voz.wav)
-	Sung     int     `json:"sung"`   // frases da letra transcrita na timeline
+	Free     bool    `json:"free"`   // gerada no modo livre
+	Mix      bool    `json:"mix"`    // gerada no modo misto
 	Edited   bool    `json:"edited"` // a timeline foi editada à mão
 }
 
@@ -73,26 +70,21 @@ type playerMsg struct {
 }
 
 func (s *Server) setlist() setlistMsg {
-	m := setlistMsg{Type: "setlist", Dir: s.show.Dir(), Songs: []songMsg{}, Orphans: []string{}, Voices: []string{}}
+	m := setlistMsg{Type: "setlist", Dir: s.show.Dir(), Songs: []songMsg{}, Orphans: []string{}}
 	used := map[string]bool{}
 	for _, so := range s.show.Songs() {
 		sm := songMsg{Index: so.Index, File: so.File, Title: so.Title, Duration: so.Duration, Genre: so.Genre, Mood: so.Mood, Error: so.Err, Link: so.Link, Gap: so.Gap.Seconds(),
-			Temp: so.Temp, AI: so.AI, Sung: so.Sung, Edited: exists(so.JSON + ".orig")}
+			Temp: so.Temp, AI: so.AI, Free: so.Free, Mix: so.Mix, Edited: exists(so.JSON + ".orig")}
 		if so.WAV != "" {
 			sm.WAV = filepath.Base(so.WAV)
-			sm.Lyrics = exists(lyricsPath(so.WAV))
-			sm.Voice = exists(analysis.VoicePath(so.WAV))
 			used[sm.WAV] = true
 		}
 		m.Songs = append(m.Songs, sm)
 	}
 	wavs, _ := filepath.Glob(filepath.Join(s.show.Dir(), "*.wav"))
 	for _, w := range wavs {
-		if b := filepath.Base(w); !used[b] && !strings.HasPrefix(b, ".") && !strings.HasSuffix(b, analysis.VoiceSuffix) {
+		if b := filepath.Base(w); !used[b] && !strings.HasPrefix(b, ".") {
 			m.Orphans = append(m.Orphans, b)
-			if exists(analysis.VoicePath(w)) {
-				m.Voices = append(m.Voices, b)
-			}
 		}
 	}
 	return m
@@ -144,8 +136,17 @@ func (s *Server) handleShow(m *inMsg) (handled bool, err error) {
 	case "scan":
 		err = s.show.Scan()
 		s.sendSetlist()
-	case "analyze": // analisar (de novo) uma faixa da pasta, com opções e letra
-		err = s.analyze(m.Str, m.AI, m.Temp, m.Lyrics, m.NoVoice)
+	case "removeSong": // Str: X.json da setlist ou X.wav sem timeline; vai para a lixeira
+		var where string
+		where, err = s.removeSong(m.Str)
+		if where != "" && err == nil {
+			s.ctl.Notice("♪ removida: %s (os arquivos estão em %s)", strings.TrimSuffix(m.Str, filepath.Ext(m.Str)), filepath.Join(filepath.Base(s.show.Dir()), where))
+		}
+		s.sendSetlist()
+		s.sendTimeline()
+		s.sendPlayer(true)
+	case "analyze": // analisar (de novo) uma faixa da pasta
+		err = s.analyze(m.Str, m.AI, m.Temp, m.Free, m.Mix)
 	case "saveTimeline": // Str: X.json da música (vazio = a carregada)
 		err = s.saveTimeline(m.Str, m.Timeline)
 	case "revertTimeline":

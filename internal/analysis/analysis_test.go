@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -100,26 +100,17 @@ func TestSectionsFollowEnergy(t *testing.T) {
 	}
 }
 
-func catalog(t *testing.T) []Preset {
+// console carrega o console e a biblioteca do repositório.
+func console(t *testing.T) *control.Console {
 	t.Helper()
-	c, err := control.LoadConsole("../../config/console.yaml")
+	c, err := control.LoadConsole("../../config/console.yaml", positions(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixtures, err := fixture.Load("../../config/fixtures.yaml", "../../config/patch.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	rig, err := control.NewRig(fixtures, c, filepath.Join(t.TempDir(), "patch.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var pos []*fixture.Fixture
-	for i := range rig.Fixtures {
-		pos = append(pos, rig.Logical(i))
-	}
-	return Catalog(c, pos)
+	return c
 }
+
+func catalog(t *testing.T) []Preset { return Catalog(console(t)) }
 
 func positions(t *testing.T) []*fixture.Fixture {
 	t.Helper()
@@ -139,35 +130,35 @@ func TestCatalog(t *testing.T) {
 	for _, p := range cat {
 		tiers[p.Agitacao]++
 		switch p.ID {
-		case "qlc:55": // PISTA | FLASH: passos de 100 ms piscando
+		case "pista:flash": // PISTA | FLASH: passos de 100 ms piscando
 			if p.Agitacao != "agitada" || p.Kind != "sequencia" {
 				t.Errorf("PISTA | FLASH: %+v", p)
 			}
-		case "qlc:47": // PISTA | CHILL: fades lentos
+		case "pista:chill": // PISTA | CHILL: fades lentos
 			if p.Agitacao != "calma" || !p.Fade {
 				t.Errorf("PISTA | CHILL: %+v", p)
 			}
-		case "qlc:94": // FRITAÇÃO | BRANCO MÁXIMO
+		case "fritacao:branco-maximo": // FRITAÇÃO | BRANCO MÁXIMO
 			if p.Layer != "flash" || p.Agitacao != "strobo" {
 				t.Errorf("FRITAÇÃO | BRANCO MÁXIMO: %+v", p)
 			}
-		case "qlc:1": // TODOS | AZUL
+		case "todos:azul": // TODOS | AZUL
 			if len(p.Colors) != 1 || p.Colors[0] != "AZUL" || p.Temp != TempCold || p.Hex != "#0000ff" {
 				t.Errorf("TODOS | AZUL: %+v", p)
 			}
-		case "qlc:10": // TODOS | VERDE LIMÃO: não é botão, mas está na biblioteca
+		case "todos:verde-limao": // TODOS | VERDE LIMÃO: não é botão, mas está na biblioteca
 			if !p.Library || p.Layer != "base" || p.Hex != "#8cff00" || p.Caption != "VERDE LIMÃO" {
 				t.Errorf("VERDE LIMÃO: %+v", p)
 			}
-		case "qlc:43": // PISTA | CLUB: o único frio agitado
+		case "pista:club": // PISTA | CLUB: o único frio agitado
 			if p.Temp != TempCold || p.Agitacao != "agitada" {
 				t.Errorf("CLUB: %+v", p)
 			}
-		case "qlc:61": // PISTA | FOGO
+		case "pista:fogo": // PISTA | FOGO
 			if p.Temp != TempWarm {
 				t.Errorf("FOGO: %+v", p)
 			}
-		case "qlc:49": // PISTA | FESTA: de tudo um pouco
+		case "pista:festa": // PISTA | FESTA: de tudo um pouco
 			if p.Temp != TempMixed {
 				t.Errorf("FESTA: %+v", p)
 			}
@@ -194,27 +185,27 @@ func TestValidateAndBuild(t *testing.T) {
 	fallback := ruleChoices(&a, cat, TempAuto)
 	llm := &choices{
 		Sections: []sectionChoice{
-			{Index: 0, Name: "intro", Preset: "qlc:47"},
-			{Index: 1, Name: "refrão", Preset: "qlc:94"}, // flash não serve de base: ignora
-			{Index: 7, Name: "?", Preset: "qlc:41"},      // parte inexistente: ignora
+			{Index: 0, Name: "intro", Preset: "pista:chill"},
+			{Index: 1, Name: "refrão", Preset: "fritacao:branco-maximo"}, // flash não serve de base: ignora
+			{Index: 7, Name: "?", Preset: "pista:pop"},                   // parte inexistente: ignora
 		},
 		Accents: []accent{
-			{Time: 40.2, Preset: "qlc:100", Beats: 9},  // encaixa em 40,0 e limita a 4 batidas
-			{Time: 45, Preset: "qlc:100", Beats: 1},    // a menos de 20 s do anterior: descarta
-			{Time: 80.1, Preset: "qlc:41", Beats: 1},   // não é flash: descarta
-			{Time: 100.26, Preset: "qlc:99", Beats: 1}, // ok, em 100,5? não: 100,0 ou 100,5 → mais perto 100,5
+			{Time: 40.2, Preset: "fritacao:branco", Beats: 9},  // encaixa em 40,0 e limita a 4 batidas
+			{Time: 45, Preset: "fritacao:branco", Beats: 1},    // a menos de 20 s do anterior: descarta
+			{Time: 80.1, Preset: "pista:pop", Beats: 1},        // não é flash: descarta
+			{Time: 100.26, Preset: "fritacao:ciano", Beats: 1}, // ok, em 100,5? não: 100,0 ou 100,5 → mais perto 100,5
 		},
 	}
-	secs, acc := validate(llm, &a, cat, fallback, TempAuto)
-	if secs[0].Preset != "qlc:47" || secs[1].Preset != fallback.Sections[1].Preset {
+	secs, acc := validate(llm, &a, cat, fallback, TempAuto, false, nil)
+	if secs[0].Preset != "pista:chill" || secs[1].Preset != fallback.Sections[1].Preset {
 		t.Fatalf("partes: %+v", secs)
 	}
 	if len(acc) != 2 || acc[0].Time != 40 || acc[0].Beats != 4 || acc[1].Time != 100.5 {
 		t.Fatalf("acentos: %+v", acc)
 	}
-	tl := build("teste", "teste.wav", a, cat, secs, acc, nil, nil, llm, "modelo", Options{}, nil)
+	tl := build("teste", "teste.wav", a, cat, secs, acc, llm, "modelo", Options{})
 	last := tl.Cues[len(tl.Cues)-1]
-	if last.Kind != "blackout" || tl.Cues[0].Preset != "qlc:47" || tl.Analysis.Sections[0].Name != "intro" {
+	if last.Kind != "blackout" || tl.Cues[0].Preset != "pista:chill" || tl.Analysis.Sections[0].Name != "intro" {
 		t.Fatalf("timeline: %+v", tl.Cues)
 	}
 	for _, c := range tl.Cues {
@@ -223,8 +214,7 @@ func TestValidateAndBuild(t *testing.T) {
 		}
 	}
 	// A timeline gerada precisa compilar no player.
-	ws, _ := control.LoadConsole("../../config/console.yaml")
-	if _, err := show.Compile(tl, show.NewPresets(ws.Workspace, nil), 10*time.Second); err != nil {
+	if _, err := show.Compile(tl, show.NewPresets(console(t).Library, positions(t)), 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -275,133 +265,9 @@ func TestTemperatureRules(t *testing.T) {
 	}
 	// O LLM pedindo um preset quente numa música fria é ignorado (fica a regra).
 	fb := ruleChoices(&a, cat, TempCold)
-	secs, _ := validate(&choices{Sections: []sectionChoice{{Index: 0, Preset: "qlc:61"}, {Index: 1, Preset: "qlc:43"}}}, &a, cat, fb, TempCold)
-	if secs[0].Preset != fb.Sections[0].Preset || secs[1].Preset != "qlc:43" {
+	secs, _ := validate(&choices{Sections: []sectionChoice{{Index: 0, Preset: "pista:fogo"}, {Index: 1, Preset: "pista:club"}}}, &a, cat, fb, TempCold, false, nil)
+	if secs[0].Preset != fb.Sections[0].Preset || secs[1].Preset != "pista:club" {
 		t.Fatalf("validação fria: %+v", secs[:2])
-	}
-}
-
-// TestLyricsColors: só com a letra colada, a cor citada acende no início da
-// parte por 4 compassos e depois volta a sequência da parte.
-func TestLyricsColors(t *testing.T) {
-	cat := catalog(t)
-	a := songAnalysis()
-	fb := ruleChoices(&a, cat, TempWarm)
-	one, two, nine := 1, 2, 9
-	llm := &choices{
-		Sections: []sectionChoice{
-			{Index: 0, Name: "verso", Preset: "qlc:10", Lyric: "teu  vestido\nverde-limão", Reason: "a letra cita"}, // cor fria fixa não serve de parte numa música quente
-		},
-		Colors: []colorChoice{
-			{Part: &one, Word: "lilás", Color: &newColor{Name: "lilás", RGB: "C8A2C8"}, Reason: "lilás na letra"},
-			{Part: &two, Word: "verde-limão", Preset: "qlc:10"},          // cor fixa fria vale: está na letra
-			{Part: &two, Color: &newColor{Name: "breu", RGB: "#050505"}}, // escura demais: ignora
-			{Part: &nine, Color: &newColor{Name: "x", RGB: "#ff0000"}},   // parte inexistente
-			{Part: &one, Preset: fb.Sections[0].Preset},                  // sequência não é cor fixa
-		},
-	}
-	secs, _ := validate(llm, &a, cat, fb, TempWarm)
-	if secs[0].Preset != fb.Sections[0].Preset {
-		t.Fatalf("parte 0: %+v", secs[0])
-	}
-	colors := validateColors(llm, &a, cat, nil)
-	if len(colors) != 2 || colors[0].T != 40 || colors[0].Preset != "cor:#c8a2c8" || colors[0].Name != "COR | LILÁS" ||
-		colors[0].Note != "letra: “lilás” · lilás na letra" || colors[1].T != 80 || colors[1].Preset != "qlc:10" {
-		t.Fatalf("cores: %+v", colors)
-	}
-
-	tl := build("teste", "teste.wav", a, cat, secs, nil, colors, nil, llm, "", Options{Temperature: TempWarm, Lyrics: "..."}, nil)
-	at := func(t float64) []show.Cue {
-		var out []show.Cue
-		for _, c := range tl.Cues {
-			if c.T == t && c.Layer == "base" {
-				out = append(out, c)
-			}
-		}
-		return out
-	}
-	// A cor substitui a troca da parte (40 s) e a parte volta 4 compassos depois.
-	if c := at(40); len(c) != 1 || c[0].Preset != "cor:#c8a2c8" {
-		t.Fatalf("40 s: %+v", c)
-	}
-	if c := at(48); len(c) != 1 || c[0].Preset != fb.Sections[1].Preset || c[0].Note != "volta depois da cor" {
-		t.Fatalf("48 s: %+v", c)
-	}
-	if !strings.Contains(string(tl.Generated), `"temperature":"quente"`) || !strings.Contains(string(tl.Generated), `"lyrics":true`) {
-		t.Fatalf("generated: %s", tl.Generated)
-	}
-	ws, _ := control.LoadConsole("../../config/console.yaml")
-	if _, err := show.Compile(tl, show.NewPresets(ws.Workspace, positions(t)), 10*time.Second); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// TestSungColors: com a versão cantada, a cor acende na batida da palavra e
-// fica até o fim da frase (2 a 4 compassos).
-func TestSungColors(t *testing.T) {
-	cat := catalog(t)
-	a := songAnalysis() // 120 BPM: batida 0,5 s, compasso 2 s; partes de 40 s
-	fb := ruleChoices(&a, cat, TempAuto)
-	s := &sung{
-		Lines: []show.Lyric{
-			{T: 39.8, End: 41, Text: "verde-limão"},
-			{T: 59, End: 63, Text: "o céu ficou azul e lilás"},
-			{T: 236, End: 239, Text: "vermelho no fim"},
-		},
-		Colors: []mention{
-			{ID: "c0", Time: 40.3, Word: "verde-limão", Line: 0}, // perto do início da parte 1 (40 s): vai para lá
-			{ID: "c1", Time: 61.3, Word: "azul", Line: 1},        // batida 61,5; frase acaba em 63 → 2 compassos
-			{ID: "c2", Time: 62, Word: "lilás", Line: 1},         // a menos de 2 batidas da anterior: fica de fora
-			{ID: "c3", Time: 237, Word: "vermelho", Line: 2},     // no fim: não volta a parte depois
-		},
-	}
-	llm := &choices{Colors: []colorChoice{
-		{ID: "c0", Preset: "qlc:10"},
-		{ID: "c1", Color: &newColor{Name: "azul céu", RGB: "#3399ff"}},
-		{ID: "c2", Color: &newColor{Name: "lilás", RGB: "#c8a2c8"}},
-		{ID: "c3", Color: &newColor{Name: "vermelho", RGB: "#ff0000"}},
-		{ID: "c3", Preset: "qlc:10"}, // repetida: vale a primeira
-		{ID: "c9", Preset: "qlc:10"}, // não existe
-	}}
-	colors := validateColors(llm, &a, cat, s)
-	if len(colors) != 4 || colors[1].Until != 63 || colors[1].Note != "letra: “o céu ficou azul e lilás”" {
-		t.Fatalf("cores: %+v", colors)
-	}
-	secs, _ := validate(nil, &a, cat, fb, TempAuto)
-	tl := build("teste", "teste.wav", a, cat, secs, nil, colors, s, llm, "", Options{}, map[string]any{"voice": true})
-	var got []string
-	for _, c := range tl.Cues {
-		if c.Layer == "base" && c.T >= 39 && c.T <= 240 && c.T != 120 && c.T != 160 && c.T != 200 {
-			got = append(got, fmt.Sprintf("%g %s", c.T, c.Name))
-		}
-	}
-	name := func(id string) string {
-		for _, x := range cat {
-			if x.ID == id {
-				return x.Name
-			}
-		}
-		return "?"
-	}
-	p := func(i int) string { return name(fb.Sections[i].Preset) }
-	want := []string{
-		"40 " + name("qlc:10"), // a cor no lugar da parte (e da troca dela)
-		"44 " + p(1),           // 2 compassos (frase curta) e volta a parte
-		"61.5 COR | AZUL CÉU",  // na batida da palavra
-		"65.5 " + p(1),         // fim da frase (63) → 2 compassos
-		"80 " + p(2),           // parte seguinte
-		"237 COR | VERMELHO",   // sem volta: a música acaba antes
-		"240 ",                 // apagão do fim
-	}
-	if strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Fatalf("trocas:\n%s\nquero:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	}
-	if len(tl.Lyrics) != 3 || !strings.Contains(string(tl.Generated), `"voice":true`) {
-		t.Fatalf("letra %+v, generated %s", tl.Lyrics, tl.Generated)
-	}
-	ws, _ := control.LoadConsole("../../config/console.yaml")
-	if _, err := show.Compile(tl, show.NewPresets(ws.Workspace, positions(t)), 10*time.Second); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -456,5 +322,132 @@ func TestNumberSections(t *testing.T) {
 	want := "intro|verso 1|verso 1|refrão 1|Verso 2|refrão 2|ponte|refrão 3|final|"
 	if strings.Join(got, "|") != want {
 		t.Fatalf("partes: %s\n   quero: %s", strings.Join(got, "|"), want)
+	}
+}
+
+func TestFreeMode(t *testing.T) {
+	cat := catalog(t)
+	a := songAnalysis()
+	fb := ruleChoices(&a, cat, TempWarm)
+	ruleEffects(&a, TempWarm, fb.Sections, nil, nil)
+	for i, s := range fb.Sections {
+		if s.Effect == nil || s.Preset != "" || s.Effect.Clean() != nil {
+			t.Fatalf("regras, parte %d: %+v", i, s)
+		}
+		if _, ok := cleanEffect(&llmEffect{Type: s.Effect.Type, Steps: s.Effect.Steps, Fade: s.Effect.Fade, Beats: s.Effect.Beats}, TempWarm); !ok {
+			t.Errorf("regras, parte %d: efeito fora da temperatura quente: %+v", i, s.Effect)
+		}
+	}
+	if calm, hot := fb.Sections[0].Effect, fb.Sections[2].Effect; calm.Sync != show.SyncHits || hot.Sync != show.SyncHits || calm.Beats != 4 || !calm.Fade || hot.Beats != 1 || hot.Fade || len(hot.Steps) < 12 {
+		t.Errorf("a sequência não acompanha a energia: %+v (calma), %+v (agitada)", calm, hot)
+	}
+	if a, b := fb.Sections[0].Effect.Steps[0], fb.Sections[3].Effect.Steps[0]; a[0] != b[0] { // mesmo grupo
+		t.Errorf("partes do mesmo grupo com paletas diferentes: %v e %v", a, b)
+	}
+
+	llm := &choices{Sections: []sectionChoice{
+		{Index: 0, Name: "intro", Free: &llmEffect{Type: "FADE", Colors: []string{"FF2000", "#ffb000"}, Beats: 3.7, Level: 0.1}},
+		{Index: 1, Name: "verso", Free: &llmEffect{Type: "chase", Colors: []string{"#ff0000", "#0000ff"}}},              // azul numa música quente: fica a regra
+		{Index: 2, Name: "refrão", Preset: "pista:fogo"},                                                                // preset no meio dos efeitos (misto)
+		{Index: 3, Name: "verso", Free: &llmEffect{Type: "laser", Colors: []string{"#ff0000"}}, Preset: "pista:quente"}, // efeito inválido: vale o preset
+		{Index: 4, Name: "refrão", Free: &llmEffect{Type: "pulse", Colors: []string{"#200000"}}},                        // escuro demais: fica a regra
+		{Index: 5, Name: "final", Free: &llmEffect{Type: "sequence", Beats: 2, Fade: true, Steps: [][]string{
+			{"#FF0000", "#ff6400", "#ffb400"}, {"#ff6400"}, {"#000000", "#ff0000"}, {"#ffffff", "#ffffff", "#ffffff"}}}},
+	}}
+	secs, _ := validate(llm, &a, cat, fb, TempWarm, true, nil)
+	if e := secs[0].Effect; e == nil || e.Type != show.FXFade || e.Colors[0] != "#ff2000" || e.Beats != 4 || e.Level != 0.4 || e.Sync != show.SyncHits {
+		t.Errorf("parte 0: %+v", secs[0].Effect)
+	}
+	if secs[1].Effect != fb.Sections[1].Effect || secs[4].Effect != fb.Sections[4].Effect {
+		t.Errorf("efeito recusado deveria deixar o das regras: %+v, %+v", secs[1].Effect, secs[4].Effect)
+	}
+	if secs[2].Effect != nil || secs[2].Preset != "pista:fogo" || secs[3].Effect != nil || secs[3].Preset != "pista:quente" {
+		t.Errorf("presets: %+v, %+v", secs[2], secs[3])
+	}
+	if e := secs[5].Effect; e == nil || e.Type != show.FXSequence || !e.Fade || e.Beats != 2 || len(e.Steps) != 3 || // o passo todo branco sai
+		e.Steps[0][0] != "#ff0000" || len(e.Steps[1]) != 3 || e.Steps[2][2] != "#800000" { // o canhão apagado fica com a cor do passo, fechada
+		t.Errorf("parte 5: %+v", secs[5].Effect)
+	}
+	for name, steps := range map[string][][]string{
+		"quase tudo apagado": {{"#ff0000", "#000000", "#000000"}, {"#000000", "#000000", "#000000"}, {"#000000", "#ff0000", "#000000"}, {"#000000", "#000000", "#000000"}},
+		"pisca-pisca":        {{"#ffffff"}, {"#000000"}},
+		"fria numa quente":   {{"#ff0000"}, {"#0000ff"}},
+		"um passo só":        {{"#ff0000"}},
+		"cor que não é cor":  {{"#ff0000"}, {"vermelho"}},
+		"passo sem cor":      {{"#ff0000"}, {}},
+	} {
+		if e, ok := cleanEffect(&llmEffect{Type: "sequence", Steps: steps}, TempWarm); ok {
+			t.Errorf("sequência %q deveria ser recusada: %+v", name, e)
+		}
+	}
+	// Fora do modo livre, o efeito do LLM é ignorado.
+	if plain, _ := validate(llm, &a, cat, ruleChoices(&a, cat, TempWarm), TempWarm, false, nil); plain[0].Effect != nil || plain[0].Preset == "" {
+		t.Errorf("efeito aceito fora do modo livre: %+v", plain[0])
+	}
+
+	tl := build("teste", "teste.wav", a, cat, secs, nil, llm, "modelo", Options{Free: true, Temperature: TempWarm})
+	if c := tl.Cues[0]; c.Kind != "effect" || c.Preset != "" || c.Name != "LIVRE | TRANSIÇÃO" || c.Effect == nil {
+		t.Errorf("troca 0: %+v", c)
+	}
+	if c := tl.Cues[2]; c.Kind != "preset" || c.Preset != "pista:fogo" || c.Effect != nil {
+		t.Errorf("troca 2: %+v", c)
+	}
+	if !strings.Contains(string(tl.Personality), `"misto"`) || !strings.Contains(string(tl.Generated), `"free":true`) {
+		t.Errorf("personality %s, generated %s", tl.Personality, tl.Generated)
+	}
+	if _, err := show.Compile(tl, show.NewPresets(console(t).Library, positions(t)), 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestPickHits: os toques saem nos picos da curva de ataques, nunca a menos de
+// minHitGap um do outro (fica o mais forte), e um trecho parado ganha batidas
+// da grade para a luz não congelar.
+func TestPickHits(t *testing.T) {
+	frame := func(sec float64) int { return int(sec * SR / hop) }
+	env := make([]float64, frame(12))
+	for _, p := range []struct{ t, v float64 }{{1, 1}, {1.5, 0.8}, {1.7, 0.3}, {2, 0.9}, {2.2, 1}, {3, 0.5}, {3.02, 0.03}} {
+		env[frame(p.t)] = p.v
+	}
+	var beats []float64
+	for b := 0.5; b < 12; b += 0.5 {
+		beats = append(beats, b)
+	}
+	hits := pickHits(env, beats, 120)
+	near := func(want float64) bool {
+		return slices.ContainsFunc(hits, func(h float64) bool { return math.Abs(h-want) < 0.03 })
+	}
+	for _, want := range []float64{1, 1.5, 2.2, 3} {
+		if !near(want) {
+			t.Errorf("faltou o toque de %.1f s: %v", want, hits)
+		}
+	}
+	if near(1.7) || near(2) {
+		t.Errorf("toque fraco colado num forte deveria sair: %v", hits)
+	}
+	for i := 1; i < len(hits); i++ {
+		if hits[i]-hits[i-1] < minHitGap-1e-3 {
+			t.Errorf("toques colados: %.3f e %.3f", hits[i-1], hits[i])
+		}
+		if hits[i]-hits[i-1] > 2.01 {
+			t.Errorf("trecho parado de %.1f s a %.1f s sem batidas da grade", hits[i-1], hits[i])
+		}
+	}
+	if pickHits(make([]float64, 100), nil, 120) != nil {
+		t.Error("silêncio não tem toques")
+	}
+}
+
+func TestColorTempOf(t *testing.T) {
+	for hex, want := range map[string]string{
+		"ff0000": TempWarm, "ff6400": TempWarm, "ffb400": TempWarm, "ff0a2d": TempWarm,
+		"0000ff": TempCold, "00ffff": TempCold, "8cff00": TempCold, "7800ff": TempCold, "00ff78": TempCold,
+		"ff2878": "", "ff00ff": "", "ffffff": "", "ffe0d0": "",
+	} {
+		var r, g, b int
+		fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+		if got := colorTempOf(r, g, b); got != want {
+			t.Errorf("#%s: %q, esperava %q", hex, got, want)
+		}
 	}
 }

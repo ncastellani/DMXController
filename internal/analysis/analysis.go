@@ -54,7 +54,12 @@ func Mono(t *audio.Track) []float64 {
 }
 
 // Analyze analisa o sinal mono a 22.050 Hz.
-func Analyze(y []float64) show.Analysis {
+func Analyze(y []float64) show.Analysis { return AnalyzeDrums(y, nil) }
+
+// AnalyzeDrums analisa o sinal mono y a 22.050 Hz; drums, se não for nil, é
+// a bateria da mesma música separada dos outros instrumentos (mesma taxa),
+// e a batida passa a ser ouvida nela (drums.go).
+func AnalyzeDrums(y, drums []float64) show.Analysis {
 	duration := float64(len(y)) / SR
 	S := stftMag(y)
 	frames := S.cols
@@ -65,14 +70,24 @@ func Analyze(y []float64) show.Analysis {
 	beats := beatTrack(onset, bpm)
 	beatTime := func(b int) float64 { return float64(b) * hop / SR }
 
+	r := rms(y, frames)
+	var ear *drumEar
+	if drums != nil {
+		ear = hearDrums(drums, frames, percentile(r, 95))
+	}
+
 	// Compasso (4/4): a fase de 4 batidas com mais grave (bumbo) é o "1".
 	low := onsetStrength(melDB(perc, melFilters(32, 0, 200)))
 	phase, bestScore := 0, math.Inf(-1)
+	kickAt := func(frame int) float64 { return low[frame] }
+	if ear != nil && percentile(ear.kick, 99) > 0 { // com a bateria separada, o bumbo dela
+		kickAt = func(frame int) float64 { return around(ear.kick, frame, 1) }
+	}
 	for p := 0; p < 4 && p < len(beats); p++ {
 		var sum float64
 		var n int
 		for i := p; i < len(beats); i += 4 {
-			sum += low[beats[i]]
+			sum += kickAt(beats[i])
 			n++
 		}
 		if n > 0 && sum/float64(n) > bestScore {
@@ -81,7 +96,6 @@ func Analyze(y []float64) show.Analysis {
 	}
 
 	// Energia: RMS normalizado (5º–95º percentil) a cada 0,5 s e por quadro.
-	r := rms(y, frames)
 	lo, hi := percentile(r, 5), percentile(r, 95)
 	norm := make([]float64, frames)
 	for i, v := range r {
@@ -94,12 +108,36 @@ func Analyze(y []float64) show.Analysis {
 	}
 
 	a := show.Analysis{Duration: round(duration, 3), BPM: round(refineBPM(beats, bpm), 2)}
-	a.Energy.Hop = 0.5
+	a.Energy.Hop = round(float64(step)*hop/SR, 5) // 22 quadros = 0,51 s (com 0,5 a curva encolhia 2% e o fim da música adiantava)
 	a.Energy.Values = curve
+	// Fim do som: o último quadro ainda audível (50 dB abaixo do nível alto da
+	// música) e, antes dele, quanto dura a cauda (desde o último quadro a
+	// menos de 20 dB do nível alto), em que a luz apaga aos poucos.
+	a.SoundEnd, a.FadeOut = soundEnd(r, duration)
 	for i, b := range beats {
 		a.Beats = append(a.Beats, round(beatTime(b), 3))
 		if i >= phase && (i-phase)%4 == 0 {
 			a.Downbeats = append(a.Downbeats, round(beatTime(b), 3))
+		}
+	}
+	// Toques: ataques na música inteira (bateria, guitarra, entradas), não só
+	// na parte percussiva.
+	mixEnv := onsetStrength(melDB(S, melFilters(128, 0, SR/2)))
+	var strength []float64 // força percussiva de cada toque (sem a bateria separada, na escala da curva)
+	if ear != nil {
+		var kinds []byte
+		a.Hits, kinds, strength = pickHitsDrums(ear, mixEnv, onset, a.Beats, a.BPM)
+		a.Drums, a.HitKind, a.HitStrength = true, string(kinds), strength
+		a.Accents = pickAccentsDrums(a.Hits, kinds, strength, ear.beatLevels(a.Beats, 60/a.BPM), a.Beats, 60/a.BPM)
+	} else {
+		a.Hits = pickHits(mixEnv, a.Beats, a.BPM)
+		strength = hitStrengths(onset, a.Hits) // percussão em cada toque
+		if len(strength) > 0 && percentile(strength, 90) > 0 {
+			top := percentile(strength, 90)
+			for _, v := range strength {
+				a.HitStrength = append(a.HitStrength, round(math.Min(1, v/top), 2))
+			}
+			a.Accents = pickAccents(a.Hits, strength, 60/a.BPM)
 		}
 	}
 	if len(beats) < 8 {
@@ -183,7 +221,52 @@ func Analyze(y []float64) show.Analysis {
 	for i, l := range labelRepeats(vecs, 0.2) {
 		a.Sections[i].Group = l
 	}
+	// A batida: divide a parte onde a bateria entra ou sai e mede a de cada uma.
+	energyOf := func(start, end float64) float64 {
+		fa, fb := int(start*SR/hop), min(int(end*SR/hop), frames)
+		return mean(norm[fa:max(fb, fa+1)])
+	}
+	if ear != nil { // pelo nível da bateria em cada batida
+		levels := ear.beatLevels(a.Beats, 60/a.BPM)
+		floor := make([]float64, len(levels)) // com um piso, para comparar com os trechos sem bateria
+		for i, v := range levels {
+			floor[i] = v + 0.02
+		}
+		snapToDrums(a.Sections, levels, a.Beats, 60/a.BPM)
+		for i := range a.Sections {
+			s := &a.Sections[i]
+			lo, _ := slices.BinarySearch(a.Beats, s.Start)
+			hi, _ := slices.BinarySearch(a.Beats, s.End)
+			s.Bars, s.Energy = int(math.RoundToEven(float64(hi-lo)/4)), round(energyOf(s.Start, s.End), 3)
+		}
+		a.Sections = splitByPulse(a.Sections, a.Beats, floor, a.Beats, 60/a.BPM, energyOf)
+		setPulseDrums(a.Sections, a.Beats, levels)
+	} else { // pela força percussiva dos toques
+		a.Sections = splitByPulse(a.Sections, a.Hits, strength, a.Beats, 60/a.BPM, energyOf)
+		setPulse(a.Sections, a.Hits, strength)
+	}
 	return a
+}
+
+// soundEnd devolve onde o som acaba (s) e a duração da cauda final (s, até
+// maxFadeOut), a partir do RMS por quadro.
+func soundEnd(r []float64, duration float64) (end, fade float64) {
+	const maxFadeOut = 12.0
+	loud := percentile(r, 95)
+	last := func(level float64) float64 {
+		for i := len(r) - 1; i >= 0; i-- {
+			if r[i] > loud*level {
+				return math.Min(duration, float64(i+1)*hop/SR)
+			}
+		}
+		return 0
+	}
+	end = duration
+	if loud > 0 {
+		end = last(0.003)
+	}
+	fade = math.Min(maxFadeOut, math.Max(0, end-last(0.1)))
+	return round(end, 3), round(fade, 3)
 }
 
 func mean(x []float64) float64 {
@@ -227,4 +310,67 @@ func refineBPM(beats []int, coarse float64) float64 {
 		return bpm
 	}
 	return coarse
+}
+
+// minHitGap é o intervalo mínimo entre dois toques (o passo mais curto de um
+// efeito: menos de 3 trocas por segundo).
+var minHitGap = show.MinEffectStep.Seconds()
+
+// pickHits acha os toques fortes da música na curva de ataques env (um valor
+// por quadro): picos locais acima da média da vizinhança. Entre dois toques
+// a menos de minHitGap, fica o mais forte. Onde a música passa mais de 4
+// batidas sem toque nenhum (trecho parado), entram batidas da grade, de 2 em
+// 2, para a luz não congelar.
+func pickHits(env, beats []float64, bpm float64) []float64 {
+	const (
+		peakWin = 3    // quadros de cada lado em que o pico é o maior (~70 ms)
+		avgWin  = 11   // quadros de cada lado para a média local (~0,25 s)
+		delta   = 0.06 // quanto acima da média local, em relação ao maior ataque
+	)
+	top := 0.0
+	for _, v := range env {
+		top = math.Max(top, v)
+	}
+	if top <= 0 {
+		return nil
+	}
+	type peak struct{ t, v float64 }
+	var cand []peak
+	for i, v := range env {
+		if v < mean(env[max(0, i-avgWin):min(len(env), i+avgWin+1)])+delta*top {
+			continue
+		}
+		if v < slices.Max(env[max(0, i-peakWin):min(len(env), i+peakWin+1)]) {
+			continue
+		}
+		cand = append(cand, peak{float64(i) * hop / SR, v})
+	}
+	slices.SortFunc(cand, func(a, b peak) int { return -cmpF(a.v, b.v) }) // os mais fortes escolhem primeiro
+	var hits []float64
+	free := func(t, gap float64) bool {
+		for _, h := range hits {
+			if math.Abs(h-t) < gap {
+				return false
+			}
+		}
+		return true
+	}
+	for _, c := range cand {
+		if free(c.t, minHitGap) {
+			hits = append(hits, c.t)
+		}
+	}
+	if bpm > 0 {
+		beat := 60 / bpm
+		for _, b := range beats {
+			if free(b, math.Max(2*beat*0.99, minHitGap)) {
+				hits = append(hits, b)
+			}
+		}
+	}
+	slices.Sort(hits)
+	for i := range hits {
+		hits[i] = round(hits[i], 3)
+	}
+	return hits
 }

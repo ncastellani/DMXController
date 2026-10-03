@@ -19,11 +19,17 @@ Conexão: WebSocket em `/ws` (mesmo host da página). Mensagens JSON com campo
 ```
 
 `layer`: `base` (toggle, um por vez), `strobe` (toggle), `flash` (segurar).
-`library`: cores fixas do workspace que não são botões (`[{"preset": "qlc:10",
+`library`: cores fixas da biblioteca que não são botões (`[{"preset": "todos:verde-limao",
 "caption": "VERDE LIMÃO", "color": "#8cff00"}]`) — só para o editor da
 timeline, não aparecem no console.
+`effects`: os modos de pista que servem de efeito, também só para o editor
+(a FLASH não entra): `[{"id": "pista:club", "name": "CLUB", "stepMs": 350, "fade":
+false, "mood": "clubber noturno vibrante", "steps": [["#0000a0", "#7800ff",
+"#ff0064"], ...]}]`. Escolher um deles troca a parte por `kind: "effect"`
+com `effect {type: "sequence", name, steps, fade}` e `sync: "hits"` (ou, com
+`stepMs` ≥ 1000, `beats` = o passo original em batidas).
 `key` é opcional (atalho de teclado no navegador). `preset` é o id usado nas
-timelines (`"qlc:47"`) — é com ele que o editor escolhe presets.
+timelines (`"pista:chill"`) — é com ele que o editor escolhe presets.
 
 **`state`** — sempre que algo muda (até ~30×/s).
 
@@ -54,11 +60,9 @@ timelines (`"qlc:47"`) — é com ele que o editor escolhe presets.
 `error` preenchido = música não pode ser carregada (JSON inválido, WAV ausente).
 Para a aba Músicas, cada música traz também `wav` (arquivo de áudio, usado em
 `analyze`), `temp` (temperatura pedida na última análise: `auto`, `quente`,
-`fria`), `ai` (gerada com IA), `lyrics` (há letra guardada em `X.letra.txt`),
-`voice` (há versão cantada em `X.voz.wav`), `sung` (frases da letra transcrita
-na timeline) e `edited` (há edições à mão). `orphans`: arquivos `.wav` da pasta
-que ainda não têm timeline (enviados sem análise); `voices`: os órfãos que já
-têm versão cantada. As versões cantadas nunca aparecem como músicas.
+`fria`), `ai` (gerada com IA), `free` (gerada com efeitos: modo livre ou misto), `mix` (gerada no modo misto)
+e `edited` (há edições à mão). `orphans`: arquivos `.wav` da pasta
+que ainda não têm timeline (enviados sem análise).
 `file` identifica a música para reordenar. `link`/`gap`: ao terminar, emenda
 com a próxima depois de `gap` segundos (0 = sem nenhum corte). Ordem e emendas
 ficam em `musicas/setlist.txt`.
@@ -114,19 +118,19 @@ O `player` também traz `calibrating: true` durante a calibração de atraso.
 **`jobs`** — fila de análise de músicas enviadas (ao conectar e a cada etapa).
 
 ```json
-{ "type": "jobs", "ai": true,
+{ "type": "jobs", "ai": true, "ear": true,
   "items": [ { "id": 1, "file": "Nova.wav", "ai": true, "stage": "a IA está ouvindo a música",
-    "temp": "quente", "voice": true, "lyrics": true, "done": false, "error": "", "warning": "" } ] }
+    "temp": "quente", "free": false, "done": false, "error": "", "warning": "" } ] }
 ```
 
-`ai`: há chave do OpenRouter (mostrar a opção "Usar IA"). Em cada item, `temp`,
-`voice` (a IA vai transcrever a versão cantada) e `lyrics` (a IA vai usar a
-letra colada) são as opções daquela análise. Etapas: `na fila`, `lendo o
-áudio`, `analisando batidas e partes`, `alinhando a versão cantada`, `a IA
-está transcrevendo a letra (N frases)`, `letra transcrita: ...`, `a IA está
+`ear`: o ouvido de bateria está instalado (a análise separa a bateria; etapa
+`separando a bateria (N%)`).
+
+`ai`: há chave do OpenRouter (mostrar a opção "Usar IA"). Em cada item, `temp` e
+`free` (modo livre) são as opções daquela análise. Etapas: `na fila`, `lendo o
+áudio`, `analisando batidas e partes`, `a IA está
 ouvindo a música`, `IA respondeu (...)`, `pronta` / `falhou`. `warning` =
-algo ficou de fora (IA indisponível e a timeline saiu só pelas regras;
-versão cantada que não bate com o playback; voz não encontrada...), com o
+algo ficou de fora (IA indisponível e a timeline saiu só pelas regras), com o
 motivo. Ao terminar, chega um `setlist` novo.
 
 **`event`** / **`events`** — log (`events` traz o histórico ao conectar).
@@ -152,8 +156,9 @@ motivo. Ao terminar, chega um `setlist` novo.
 | `{"type":"identify","pos":P}` | acende só aquele canhão por 3 s |
 | `{"type":"scan"}` | relê a pasta da setlist |
 | `{"type":"reorder","files":["b.json","a.json",...]}` | nova ordem da setlist |
+| `{"type":"removeSong","str":"X.json"}` | remove a música da setlist (ou, com `"X.wav"`, uma faixa ainda sem timeline): sai do `setlist.txt` e a timeline, o `.orig` e o áudio vão para `musicas/lixeira/<nome> (<data>)/` (dá para recuperar movendo de volta). Recusada se a música está **tocando** no show ou na fila de análise; carregada e parada/pausada, é descarregada antes. Depois chegam `setlist`, `timeline` e `player` |
 | `{"type":"link","str":"a.json","down":true,"t":0.5}` | emendar `a.json` com a próxima depois de `t` s (`down:false` desliga) |
-| `{"type":"analyze","str":"X.wav","ai":true,"temp":"quente","lyrics":"...","noVoice":false}` | analisa (ou analisa de novo) uma faixa da pasta; `lyrics` substitui a letra guardada (`""` apaga, `null`/ausente mantém); `noVoice: true` apaga a versão cantada antes. Com IA e `X.voz.wav`, a letra é transcrita dela. A timeline existente é substituída e a música carregada passa a seguir a nova na hora |
+| `{"type":"analyze","str":"X.wav","ai":true,"temp":"quente","free":false,"mix":false}` | analisa (ou analisa de novo) uma faixa da pasta; `free: true` = modo livre (efeitos criados para a música, misturados aos presets; ver `TIMELINE.md`); A timeline existente é substituída e a música carregada passa a seguir a nova na hora |
 | `{"type":"saveTimeline","str":"X.json","timeline":{...}}` | grava a timeline editada da música `X.json` (sem `str`: a carregada); se ela está tocando ou emendada, vale na hora (ver abaixo) |
 | `{"type":"revertTimeline","str":"X.json"}` | volta a música para a versão gerada (`.orig`; sem `str`: a carregada) |
 | `{"type":"load","id":N}` | carrega a música `N` da setlist (parada no início; **para a atual**) |
@@ -161,7 +166,7 @@ motivo. Ao terminar, chega um `setlist` novo.
 | `{"type":"stop"}` | para, volta ao início e tira a timeline da luz |
 | `{"type":"seek","t":S}` | vai para `S` segundos |
 | `{"type":"volume","value":V}` | volume 0–100 |
-| `{"type":"latency","value":MS}` | atraso da saída de som a compensar (0–1000 ms), salvo |
+| `{"type":"latency","value":MS}` | atraso da saída de som a compensar (−1000 a 1000 ms; negativo = o som sai antes da luz), salvo |
 | `{"type":"calibrate"}` | cliques a 100 BPM + todos os canhões piscando; `stop` encerra |
 | `{"type":"sound","arg":"output","str":ID}` | troca a saída de som do sistema |
 | `{"type":"sound","arg":"scan"}` | procura caixas Bluetooth (~12 s) |
@@ -175,12 +180,20 @@ timeline por `GET /api/timeline`, edita uma cópia e manda inteira em
 `saveTimeline` com `str` = o `file` da música; a resposta é um
 `songTimeline` para todos.
 O servidor só aceita mudanças em `cues` e no `name` das partes (o resto, como
-a grade e a letra transcrita, vem da versão carregada), ordena as cues, limita fritações a 10 s, valida os
+a grade, vem da versão carregada), ordena as cues, limita fritações a 10 s, valida os
 presets e só então grava. Em cue de base com preset trocado, mande
 `"rate": 0` (e `"name": ""`): o servidor recalcula o encaixe na batida e o nome.
 Além dos `preset` dos botões, uma troca de base aceita as cores de
 `config.library` e cores criadas: `"preset": "cor:#rrggbb"` (acende os 3
 canhões nessa cor; o nome vira `COR | #rrggbb` se vier vazio).
+Uma troca de base também pode ser um **efeito livre**: `"kind": "effect"` com
+`"effect": {"type", "colors", "beats", "level"}` (ou, no tipo `sequence`,
+`"steps": [[esq, centro, dir], ...]` e `"fade"` no lugar de `colors`; com
+`"sync": "hits"` o passo troca nos toques da música em vez de a cada `beats`) e sem
+`preset` (tipos e limites em `TIMELINE.md`). O servidor acerta os valores (cores em minúsculas,
+`beats` aceito mais próximo, cores a mais cortadas), recusa tipo ou cor
+inválidos e dá o nome `LIVRE | <TIPO>` se `name` vier vazio (mande vazio ao
+trocar o tipo).
 
 ## Envio de músicas (HTTP)
 
@@ -188,23 +201,14 @@ canhões nessa cor; o nome vira `COR | #rrggbb` se vier vazio).
 corpo (sem multipart; use `XMLHttpRequest` para ter progresso do envio). Com
 `analisar=0` o arquivo só é guardado e a resposta traz o nome final
 (`{"file": "X.wav"}`); a análise vem depois pela mensagem `analyze` (com as
-opções e a letra). Sem `analisar=0`, entra direto na fila
-(`&ia=1&temp=quente`).
+opções). Sem `analisar=0`, entra direto na fila
+(`&ia=1&temp=quente&livre=1`).
 
 - `202` aceito.
 - `409` já há uma timeline com esse nome → confirmar com a pessoa e reenviar com
   `replace=1` (a timeline é gerada de novo; edições se perdem). Um `.wav` sem
   timeline é substituído sem perguntar.
-- `400` nome/arquivo inválido (não é WAV; nomes terminados em `.voz.wav` são
-  reservados); `403` origem diferente da página.
-
-**Versão cantada**: `POST /api/upload?name=<X.wav>&voz=1` com o `.wav` da
-mesma faixa com a voz. Precisa do playback `X.wav` já na pasta (senão `400`);
-fica como `X.voz.wav`, substituindo a anterior, e não entra na fila (a análise
-vem pela mensagem `analyze`). O show nunca toca esse arquivo.
-
-`GET /api/lyrics?file=<arquivo.wav>` devolve a letra guardada (texto puro,
-vazio se não houver), para preencher o campo ao analisar de novo.
+- `400` nome/arquivo inválido (não é WAV); `403` origem diferente da página.
 
 ## Prévia e editor (HTTP)
 
@@ -229,9 +233,6 @@ A música é sempre o `file` da `setlist` (`X.json`); fora dela, `404`.
   piscar enquanto a prévia toca, **no máximo 3 vezes por segundo**.
 - `GET /api/audio?file=X.json` → o `.wav` da música (`audio/wav`, aceita
   `Range`), para ouvir a prévia **no navegador** (não sai na caixa do show).
-  Com `&voz=1`, a versão cantada ("Ouvir com voz"); o atraso dela em relação
-  ao playback está em `timeline.generated.voice.shift` (s) e a página o
-  desconta para a luz continuar no tempo.
 
 ## Regras que o frontend precisa respeitar
 

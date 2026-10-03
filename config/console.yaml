@@ -1,14 +1,14 @@
-# Botões do show (gerado da Virtual Console do QLC+).
+# Botões do show.
 #
-# function: ID da Function no workspace do QLC+.
+# preset:   id do preset na biblioteca (biblioteca.yaml): cor, strobo ou modo de pista.
 # layer:    base   - modos de pista e cores fixas; um por vez (apertar de novo apaga)
 #           strobe - strobo contínuo; sobrepõe a base (apertar de novo desliga)
 #           flash  - só enquanto o botão estiver segurado; sobrepõe tudo
-# color:    cor do botão na interface web (copiada da Virtual Console).
+# color:    cor do botão na interface web.
 # key:      atalho de teclado na interface web (opcional, uma letra).
 #           Fixos: espaço = blackout | b = parar strobe | Esc = parar tudo
 
-workspace: aniversario_STROBE.qxw
+library: biblioteca.yaml
 
 # Segurança (strobo/flash): tempo máximo ativo antes de desligar sozinho.
 limits:
@@ -19,67 +19,67 @@ groups:
   - name: "MODOS DE PISTA"  # um modo por vez
     layer: base
     buttons:
-      - {caption: "AZUL ROSA", function: 30, color: "#3f55c8"}
-      - {caption: "BATIDÃO", function: 51, color: "#b01540"}
-      - {caption: "BRANCO VERMELHO", function: 57, color: "#d62828"}
-      - {caption: "CALOR", function: 63, color: "#c75a18"}
-      - {caption: "CAOS QUENTE", function: 73, color: "#c42b0a"}
-      - {caption: "CHILL", function: 47, color: "#35539e"}
-      - {caption: "CINEMA", function: 69, color: "#7a2626"}
-      - {caption: "CLUB", function: 43, color: "#5a39c8"}
-      - {caption: "COLOR FLOW", function: 53, color: "#3a93a8"}
-      - {caption: "CONTRAMÃO", function: 65, color: "#b24f14"}
-      - {caption: "DOURADO VERMELHO", function: 71, color: "#cf8012"}
-      - {caption: "FESTA", function: 49, color: "#bd3ba2"}
-      - {caption: "FLASH", function: 55, color: "#e8e8e8"}
-      - {caption: "FOGO", function: 61, color: "#e8470f"}
-      - {caption: "FOGO CRUZADO", function: 89, color: "#e05410"}
-      - {caption: "GOLDEN", function: 59, color: "#d4a017"}
-      - {caption: "IMPACTO", function: 83, color: "#d02828"}
-      - {caption: "MENINOS E MENINAS 1", function: 79, color: "#8e2a80"}
-      - {caption: "MENINOS E MENINAS 2", function: 33, color: "#8e2a80"}
-      - {caption: "MENINOS E MENINAS 3", function: 81, color: "#8e2a80"}
-      - {caption: "PERSEGUIÇÃO", function: 85, color: "#d4860f"}
-      - {caption: "POP", function: 41, color: "#d13c8c"}
-      - {caption: "PULSO QUENTE", function: 67, color: "#a8481a"}
-      - {caption: "PULSO QUENTE 2", function: 93, color: "#a8481a"}
-      - {caption: "QUENTE", function: 45, color: "#d14a14"}
-      - {caption: "RED 200", function: 77, color: "#c02020"}
-      - {caption: "SURTO QUENTE", function: 91, color: "#bd350a"}
-      - {caption: "TRICOLOR", function: 35, color: "#6a4ac0"}
-      - {caption: "VERDE AZUL ROSA", function: 39, color: "#1f8f8f"}
-      - {caption: "VERDE ROSA", function: 37, color: "#2e9460"}
-      - {caption: "VERMELHO BRANCO 2", function: 87, color: "#e03535"}
-      - {caption: "ÂMBAR 200", function: 75, color: "#d79415"}
+      - {caption: "AZUL ROSA", preset: "pista:azul-rosa", color: "#3f55c8"}
+      - {caption: "BATIDÃO", preset: "pista:batidao", color: "#b01540"}
+      - {caption: "BRANCO VERMELHO", preset: "pista:branco-vermelho", color: "#d62828"}
+      - {caption: "CALOR", preset: "pista:calor", color: "#c75a18"}
+      - {caption: "CAOS QUENTE", preset: "pista:caos-quente", color: "#c42b0a"}
+      - {caption: "CHILL", preset: "pista:chill", color: "#35539e"}
+      - {caption: "CINEMA", preset: "pista:cinema", color: "#7a2626"}
+      - {caption: "CLUB", preset: "pista:club", color: "#5a39c8"}
+      - {caption: "COLOR FLOW", preset: "pista:color-flow", color: "#3a93a8"}
+      - {caption: "CONTRAMÃO", preset: "pista:contramao", color: "#b24f14"}
+      - {caption: "DOURADO VERMELHO", preset: "pista:dourado-vermelho", color: "#cf8012"}
+      - {caption: "FESTA", preset: "pista:festa", color: "#bd3ba2"}
+      - {caption: "FLASH", preset: "pista:flash", color: "#e8e8e8"}
+      - {caption: "FOGO", preset: "pista:fogo", color: "#e8470f"}
+      - {caption: "FOGO CRUZADO", preset: "pista:fogo-cruzado", color: "#e05410"}
+      - {caption: "GOLDEN", preset: "pista:golden", color: "#d4a017"}
+      - {caption: "IMPACTO", preset: "pista:impacto", color: "#d02828"}
+      - {caption: "MENINOS E MENINAS 1", preset: "pista:meninos-e-meninas-1", color: "#8e2a80"}
+      - {caption: "MENINOS E MENINAS 2", preset: "pista:meninos-e-meninas-2", color: "#8e2a80"}
+      - {caption: "MENINOS E MENINAS 3", preset: "pista:meninos-e-meninas-3", color: "#8e2a80"}
+      - {caption: "PERSEGUIÇÃO", preset: "pista:perseguicao", color: "#d4860f"}
+      - {caption: "POP", preset: "pista:pop", color: "#d13c8c"}
+      - {caption: "PULSO QUENTE", preset: "pista:pulso-quente", color: "#a8481a"}
+      - {caption: "PULSO QUENTE 2", preset: "pista:pulso-quente-2", color: "#a8481a"}
+      - {caption: "QUENTE", preset: "pista:quente", color: "#d14a14"}
+      - {caption: "RED 200", preset: "pista:red-200", color: "#c02020"}
+      - {caption: "SURTO QUENTE", preset: "pista:surto-quente", color: "#bd350a"}
+      - {caption: "TRICOLOR", preset: "pista:tricolor", color: "#6a4ac0"}
+      - {caption: "VERDE AZUL ROSA", preset: "pista:verde-azul-rosa", color: "#1f8f8f"}
+      - {caption: "VERDE ROSA", preset: "pista:verde-rosa", color: "#2e9460"}
+      - {caption: "VERMELHO BRANCO 2", preset: "pista:vermelho-branco-2", color: "#e03535"}
+      - {caption: "ÂMBAR 200", preset: "pista:ambar-200", color: "#d79415"}
   - name: "CORES FIXAS"  # também na camada base: trocar de cor encerra o modo de pista
     layer: base
     buttons:
-      - {caption: "BRANCO", function: 6, key: q, color: "#ffffff"}
-      - {caption: "VERMELHO", function: 0, key: w, color: "#ff0000"}
-      - {caption: "VERMELHO PROFUNDO", function: 22, key: e, color: "#c80000"}
-      - {caption: "ROSA VERMELHO", function: 24, key: r, color: "#ff0a2d"}
-      - {caption: "ÂMBAR", function: 16, key: t, color: "#ff2d00"}
-      - {caption: "ÂMBAR DOURADO", function: 18, key: y, color: "#ff3700"}
-      - {caption: "DOURADO", function: 17, key: u, color: "#ff5000"}
-      - {caption: "LARANJA QUEIMADO", function: 20, key: i, color: "#ff1900"}
-      - {caption: "ROXO PROFUNDO", function: 31, key: o, color: "#5a00c8"}
-      - {caption: "AZUL", function: 1, key: p, color: "#0000ff"}
-      - {caption: "AZUL PROFUNDO", function: 12, key: k, color: "#0000a0"}
-      - {caption: "CIANO", function: 8, key: l, color: "#00ffff"}
+      - {caption: "BRANCO", preset: "todos:branco", key: q, color: "#ffffff"}
+      - {caption: "VERMELHO", preset: "todos:vermelho", key: w, color: "#ff0000"}
+      - {caption: "VERMELHO PROFUNDO", preset: "todos:vermelho-profundo", key: e, color: "#c80000"}
+      - {caption: "ROSA VERMELHO", preset: "todos:rosa-vermelho", key: r, color: "#ff0a2d"}
+      - {caption: "ÂMBAR", preset: "todos:ambar", key: t, color: "#ff2d00"}
+      - {caption: "ÂMBAR DOURADO", preset: "todos:ambar-dourado", key: y, color: "#ff3700"}
+      - {caption: "DOURADO", preset: "todos:dourado", key: u, color: "#ff5000"}
+      - {caption: "LARANJA QUEIMADO", preset: "todos:laranja-queimado", key: i, color: "#ff1900"}
+      - {caption: "ROXO PROFUNDO", preset: "todos:roxo-profundo", key: o, color: "#5a00c8"}
+      - {caption: "AZUL", preset: "todos:azul", key: p, color: "#0000ff"}
+      - {caption: "AZUL PROFUNDO", preset: "todos:azul-profundo", key: k, color: "#0000a0"}
+      - {caption: "CIANO", preset: "todos:ciano", key: l, color: "#00ffff"}
   - name: "FRITAÇÃO"  # só enquanto a tecla estiver segurada
     layer: flash
     buttons:
-      - {caption: "BRANCO MÁX. 255", function: 94, key: a, color: "#ffffff"}
-      - {caption: "BRANCO 254", function: 100, key: s, color: "#ffffff"}
-      - {caption: "VERMELHO 253", function: 95, key: d, color: "#ff0000"}
-      - {caption: "LARANJA 252", function: 96, key: f, color: "#ff1900"}
-      - {caption: "AZUL PROF. 253", function: 97, key: g, color: "#0000a0"}
-      - {caption: "AZUL 252", function: 98, key: h, color: "#0000ff"}
-      - {caption: "CIANO 254", function: 99, key: j, color: "#00ffff"}
+      - {caption: "BRANCO MÁX. 255", preset: "fritacao:branco-maximo", key: a, color: "#ffffff"}
+      - {caption: "BRANCO 254", preset: "fritacao:branco", key: s, color: "#ffffff"}
+      - {caption: "VERMELHO 253", preset: "fritacao:vermelho", key: d, color: "#ff0000"}
+      - {caption: "LARANJA 252", preset: "fritacao:laranja-queimado", key: f, color: "#ff1900"}
+      - {caption: "AZUL PROF. 253", preset: "fritacao:azul-profundo", key: g, color: "#0000a0"}
+      - {caption: "AZUL 252", preset: "fritacao:azul", key: h, color: "#0000ff"}
+      - {caption: "CIANO 254", preset: "fritacao:ciano", key: j, color: "#00ffff"}
   - name: "STROBE CONTÍNUO"  # toggle; "b" desliga
     layer: strobe
     buttons:
-      - {caption: "BRANCO 254", function: 101, key: z, color: "#ffffff"}
-      - {caption: "VERMELHO 253", function: 102, key: x, color: "#ff0000"}
-      - {caption: "LARANJA 252", function: 103, key: c, color: "#ff1900"}
-      - {caption: "AZUL PROF. 253", function: 104, key: v, color: "#0000a0"}
+      - {caption: "BRANCO 254", preset: "strobe:branco-254", key: z, color: "#ffffff"}
+      - {caption: "VERMELHO 253", preset: "strobe:vermelho-253", key: x, color: "#ff0000"}
+      - {caption: "LARANJA 252", preset: "strobe:laranja-252", key: c, color: "#ff1900"}
+      - {caption: "AZUL PROF. 253", preset: "strobe:azul-profundo-253", key: v, color: "#0000a0"}

@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 
+	"github.com/ncastellani/DMXController/internal/analysis"
 	"github.com/ncastellani/DMXController/internal/control"
 	"github.com/ncastellani/DMXController/internal/engine"
 )
@@ -16,9 +17,21 @@ type configMsg struct {
 	} `json:"groups"`
 	FlashLimit  float64 `json:"flashLimit"`  // segundos
 	StrobeLimit float64 `json:"strobeLimit"` // segundos
-	// Library são cores fixas do workspace que não estão nos botões (para o
+	// Library são cores fixas da biblioteca que não estão nos botões (para o
 	// editor da timeline; não aparecem no console).
 	Library []libraryMsg `json:"library"`
+	// Effects são os modos de pista que servem de efeito (os passos copiados
+	// para a música), para o editor trocar uma parte por um deles.
+	Effects []effectMsg `json:"effects"`
+}
+
+type effectMsg struct {
+	ID     string     `json:"id"` // "pista:club"
+	Name   string     `json:"name"`
+	StepMs float64    `json:"stepMs"` // a partir de 1000, o efeito segue esse passo (em batidas) em vez dos toques
+	Fade   bool       `json:"fade,omitempty"`
+	Mood   string     `json:"mood,omitempty"` // clima em poucas palavras
+	Steps  [][]string `json:"steps"`
 }
 
 type libraryMsg struct {
@@ -32,7 +45,7 @@ type buttonMsg struct {
 	Caption string `json:"caption"`
 	Color   string `json:"color,omitempty"`
 	Key     string `json:"key,omitempty"`
-	Preset  string `json:"preset"` // id usado na timeline ("qlc:47")
+	Preset  string `json:"preset"` // id usado na timeline ("pista:chill")
 }
 
 type stateMsg struct {
@@ -89,7 +102,7 @@ func (s *Server) config() configMsg {
 				continue
 			}
 			grp.Layer = b.Layer.String()
-			bm := buttonMsg{ID: b.ID, Caption: b.Caption, Color: b.Color, Preset: fmt.Sprintf("qlc:%d", b.Function)}
+			bm := buttonMsg{ID: b.ID, Caption: b.Caption, Color: b.Color, Preset: b.Preset}
 			if b.Key != 0 {
 				bm.Key = string(b.Key)
 			}
@@ -98,6 +111,20 @@ func (s *Server) config() configMsg {
 		m.Groups = append(m.Groups, grp)
 	}
 	m.Library = []libraryMsg{}
+	s.effectsOnce.Do(func() { // a biblioteca não muda com o programa aberto
+		s.effects = []effectMsg{}
+		for i := range c.Library.Effects {
+			e := &c.Library.Effects[i]
+			if fx, ok := analysis.LibraryEffect(e, 0, nil, analysis.TempAuto); ok { // os passos como efeito: sem branco total nem apagado
+				em := effectMsg{ID: e.ID, Name: e.Name, StepMs: e.TypicalStep(), Fade: e.Fades(), Steps: fx.Steps}
+				if e.Mood != nil {
+					em.Mood = e.Mood.Label
+				}
+				s.effects = append(s.effects, em)
+			}
+		}
+	})
+	m.Effects = s.effects
 	if s.importer != nil {
 		for _, p := range s.importer.Catalog {
 			if p.Library {

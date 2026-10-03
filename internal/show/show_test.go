@@ -11,16 +11,26 @@ import (
 	"github.com/ncastellani/DMXController/internal/dmx"
 	"github.com/ncastellani/DMXController/internal/engine"
 	"github.com/ncastellani/DMXController/internal/fixture"
-	"github.com/ncastellani/DMXController/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/library"
 )
 
-func workspace(t *testing.T) *qlc.Workspace {
+func workspace(t *testing.T) *library.Library {
 	t.Helper()
-	ws, err := qlc.Load("../../config/aniversario_STROBE.qxw")
+	lib, err := library.Load("../../config/biblioteca.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ws
+	return lib
+}
+
+// rig são os 3 canhões nos endereços lógicos 1, 8 e 15.
+func rig(t *testing.T) []*fixture.Fixture {
+	t.Helper()
+	fixtures, err := fixture.Load("../../config/fixtures.yaml", "../../config/patch.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fixtures
 }
 
 func timeline(cues ...Cue) *Timeline {
@@ -37,11 +47,11 @@ func at(p *Program, s float64) dmx.Frame {
 }
 
 func TestProgram(t *testing.T) {
-	presets := NewPresets(workspace(t), nil)
+	presets := NewPresets(workspace(t), rig(t))
 	prog, err := Compile(timeline(
-		Cue{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:0"},                   // TODOS | VERMELHO
-		Cue{T: 10, Layer: "base", Kind: "preset", Preset: "qlc:1"},                  // TODOS | AZUL
-		Cue{T: 12, Layer: "flash", Kind: "preset", Preset: "qlc:100", Duration: 60}, // FRITAÇÃO | BRANCO
+		Cue{T: 0, Layer: "base", Kind: "preset", Preset: "todos:vermelho"},                  // TODOS | VERMELHO
+		Cue{T: 10, Layer: "base", Kind: "preset", Preset: "todos:azul"},                     // TODOS | AZUL
+		Cue{T: 12, Layer: "flash", Kind: "preset", Preset: "fritacao:branco", Duration: 60}, // FRITAÇÃO | BRANCO
 		Cue{T: 18, Layer: "base", Kind: "blackout"},
 	), presets, 2*time.Second)
 	if err != nil {
@@ -64,16 +74,16 @@ func TestProgram(t *testing.T) {
 		t.Fatalf("t=19: deveria estar apagado: %v", f[:7])
 	}
 	cur, next := prog.Current(secs(11))
-	if cur == nil || cur.Preset != "qlc:1" || next == nil || next.T != 12 {
+	if cur == nil || cur.Preset != "todos:azul" || next == nil || next.T != 12 {
 		t.Fatalf("Current(11) = %+v, %+v", cur, next)
 	}
 }
 
 func TestSequenceRate(t *testing.T) {
-	presets := NewPresets(workspace(t), nil)
+	presets := NewPresets(workspace(t), rig(t))
 	// PISTA | FLASH (id 55): passos de 100 ms alternando branco e apagado.
-	normal, _ := Compile(timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:55", Rate: 1}), presets, time.Second)
-	fast, _ := Compile(timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:55", Rate: 2}), presets, time.Second)
+	normal, _ := Compile(timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "pista:flash", Rate: 1}), presets, time.Second)
+	fast, _ := Compile(timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "pista:flash", Rate: 2}), presets, time.Second)
 	// Em 0,15 s: normal está no passo 1 (apagado); 2× está no passo 3 (apagado)... compara 0,05 vs 0,025.
 	if at(normal, 0.15)[0] != 0 || at(normal, 0.05)[0] != 255 {
 		t.Fatal("sequência normal fora do esperado")
@@ -84,7 +94,7 @@ func TestSequenceRate(t *testing.T) {
 }
 
 func TestCompileErrors(t *testing.T) {
-	presets := NewPresets(workspace(t), nil)
+	presets := NewPresets(workspace(t), rig(t))
 	for _, c := range []Cue{
 		{Layer: "base", Kind: "preset", Preset: "qlc:9999"},
 		{Layer: "base", Kind: "preset", Preset: "user:x"},
@@ -106,7 +116,7 @@ func TestRealTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Compile(tl, NewPresets(workspace(t), nil), 10*time.Second); err != nil {
+	if _, err := Compile(tl, NewPresets(workspace(t), rig(t)), 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -114,7 +124,7 @@ func TestRealTimeline(t *testing.T) {
 // TestShowClock usa o relógio interno (sem saída de som).
 func TestShowClock(t *testing.T) {
 	dir := t.TempDir()
-	tl := timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "qlc:0"}, Cue{T: 10, Layer: "base", Kind: "preset", Preset: "qlc:1"})
+	tl := timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "todos:vermelho"}, Cue{T: 10, Layer: "base", Kind: "preset", Preset: "todos:azul"})
 	data, _ := json.Marshal(tl)
 	os.WriteFile(filepath.Join(dir, "01-teste.json"), data, 0o644)
 	os.WriteFile(filepath.Join(dir, "teste.wav"), nil, 0o644)
@@ -122,7 +132,7 @@ func TestShowClock(t *testing.T) {
 
 	eng := &engine.Engine{}
 	var log []string
-	sh := New(dir, NewPresets(workspace(t), nil), eng, nil, time.Second, func(f string, a ...any) { log = append(log, f) })
+	sh := New(dir, NewPresets(workspace(t), rig(t)), eng, nil, time.Second, func(f string, a ...any) { log = append(log, f) })
 	if err := sh.Scan(); err != nil {
 		t.Fatal(err)
 	}
@@ -188,10 +198,10 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func TestContinuousPlayback(t *testing.T) {
 	dir := t.TempDir()
-	writeSong(t, dir, "a", 0.4, "qlc:0") // TODOS | VERMELHO
-	writeSong(t, dir, "b", 0.4, "qlc:1") // TODOS | AZUL
+	writeSong(t, dir, "a", 0.4, "todos:vermelho") // TODOS | VERMELHO
+	writeSong(t, dir, "b", 0.4, "todos:azul")     // TODOS | AZUL
 	eng := &engine.Engine{}
-	sh := New(dir, NewPresets(workspace(t), nil), eng, nil, time.Second, func(string, ...any) {})
+	sh := New(dir, NewPresets(workspace(t), rig(t)), eng, nil, time.Second, func(string, ...any) {})
 	changed := 0
 	sh.OnChange(func() { changed++ })
 	sh.Scan()
@@ -236,9 +246,9 @@ func TestContinuousPlayback(t *testing.T) {
 
 func TestUnlinkRemovesQueued(t *testing.T) {
 	dir := t.TempDir()
-	writeSong(t, dir, "a", 2, "qlc:0")
-	writeSong(t, dir, "b", 2, "qlc:1")
-	sh := New(dir, NewPresets(workspace(t), nil), &engine.Engine{}, nil, time.Second, func(string, ...any) {})
+	writeSong(t, dir, "a", 2, "todos:vermelho")
+	writeSong(t, dir, "b", 2, "todos:azul")
+	sh := New(dir, NewPresets(workspace(t), rig(t)), &engine.Engine{}, nil, time.Second, func(string, ...any) {})
 	sh.Scan()
 	sh.SetLink("a.json", true, 0)
 	sh.Load(0)
@@ -296,9 +306,9 @@ func TestColorPreset(t *testing.T) {
 // No mesmo instante, a fritação aparece antes da base (ela acaba e a base fica).
 func TestSortCues(t *testing.T) {
 	cues := []Cue{
-		{T: 31.7, Layer: "base", Preset: "qlc:41"},
-		{T: 31.7, Layer: "flash", Preset: "qlc:99"},
-		{T: 0, Layer: "base", Preset: "qlc:47"},
+		{T: 31.7, Layer: "base", Preset: "pista:pop"},
+		{T: 31.7, Layer: "flash", Preset: "fritacao:ciano"},
+		{T: 0, Layer: "base", Preset: "pista:chill"},
 		{T: 31.7, Layer: "base", Kind: "blackout"},
 	}
 	SortCues(cues)
@@ -306,7 +316,92 @@ func TestSortCues(t *testing.T) {
 	for _, c := range cues {
 		got = append(got, c.Layer+":"+c.Preset+c.Kind)
 	}
-	if want := "base:qlc:47|flash:qlc:99|base:qlc:41|base:blackout"; strings.Join(got, "|") != want {
+	if want := "base:pista:chill|flash:fritacao:ciano|base:pista:pop|base:blackout"; strings.Join(got, "|") != want {
 		t.Fatalf("ordem %s, quero %s", strings.Join(got, "|"), want)
+	}
+}
+
+// TestAccentBump: num pico da música o canhão do centro dá um flash branco e
+// os dos lados clareiam de leve, voltando em menos de um terço de segundo;
+// sem base (apagado) não acende nada, e dois picos colados viram um só.
+func TestAccentBump(t *testing.T) {
+	tl := timeline(
+		Cue{T: 0, Layer: "base", Kind: "preset", Preset: "todos:azul"},
+		Cue{T: 10, Layer: "base", Kind: "blackout"},
+	)
+	tl.Analysis.Accents = []Accent{{T: 2, V: 1}, {T: 2.6, V: 1}, {T: 5, V: 0.6}, {T: 12, V: 1}}
+	p, err := Compile(tl, NewPresets(workspace(t), rig(t)), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.accents) != 3 {
+		t.Fatalf("picos a menos de 1 s deveriam virar um: %+v", p.accents)
+	}
+	look := func(pos int, s float64) fixture.Color {
+		f := at(p, s)
+		c, strobe := rig(t)[pos].Look(&f)
+		if strobe {
+			t.Fatalf("realce não liga strobo (%.2fs)", s)
+		}
+		return c
+	}
+	const left, center = 0, 1
+	blue, white := fixture.Color{B: 255}, fixture.Color{R: 255, G: 255, B: 255}
+	if look(center, 1.9) != blue || look(center, 2.3) != blue || look(center, 2.6) != blue || look(left, 4.9) != blue {
+		t.Errorf("fora do pico a cor não muda: %v %v", look(center, 1.9), look(center, 2.3))
+	}
+	if c := look(center, 2.0); c != white {
+		t.Errorf("no pico, o centro vai ao branco: %v", c)
+	}
+	if c := look(left, 2.0); c.R < 70 || c.R > 82 || c.B != 255 { // os lados só clareiam
+		t.Errorf("no pico, o lado: %v", c)
+	}
+	if a, b := look(center, 2.05), look(center, 2.2); !(a.R > b.R && b.R > 0 && a.R < 255) {
+		t.Errorf("o flash deveria cair suave: %v depois %v", a, b)
+	}
+	if c := look(center, 5.0); c.R < 148 || c.R > 158 { // pico mais fraco, flash mais fraco
+		t.Errorf("pico de força 0,6: %v", c)
+	}
+	if c := look(center, 12.0); c != (fixture.Color{}) {
+		t.Errorf("apagado continua apagado: %v", c)
+	}
+}
+
+// TestFadeOut: antes de um blackout com fade a luz apaga aos poucos, mesmo
+// atravessando uma troca de base, e só fica preta no blackout.
+func TestFadeOut(t *testing.T) {
+	tl := timeline(
+		Cue{T: 0, Layer: "base", Kind: "preset", Preset: "todos:vermelho"},
+		Cue{T: 16, Layer: "base", Kind: "preset", Preset: "todos:azul"},
+		Cue{T: 20, Layer: "base", Kind: "blackout", Fade: 8},
+	)
+	p, err := Compile(tl, NewPresets(workspace(t), rig(t)), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	look := func(s float64) fixture.Color {
+		f := at(p, s)
+		c, _ := rig(t)[0].Look(&f)
+		return c
+	}
+	if c := look(11.9); c != (fixture.Color{R: 255}) {
+		t.Errorf("antes do fade: %v", c)
+	}
+	if c := look(14); c.R < 185 || c.R > 197 { // 2 de 8 s: 75% do brilho
+		t.Errorf("fade em 14 s: %v", c)
+	}
+	if c := look(18); c.R != 0 || c.B < 60 || c.B > 68 { // já no azul, 25% do brilho
+		t.Errorf("fade em 18 s: %v", c)
+	}
+	if c := look(19.9); c.B == 0 || c.B > 6 {
+		t.Errorf("ainda há um resto de luz logo antes do fim: %v", c)
+	}
+	if c := look(20); c != (fixture.Color{}) {
+		t.Errorf("no blackout: %v", c)
+	}
+	// Um fade absurdo num arquivo editado à mão é limitado.
+	bad := timeline(Cue{T: 0, Layer: "base", Kind: "preset", Preset: "todos:azul"}, Cue{T: 10, Layer: "base", Kind: "blackout", Fade: 999})
+	if _, err := Compile(bad, NewPresets(workspace(t), rig(t)), time.Second); err != nil || bad.Cues[1].Fade != maxCueFade {
+		t.Errorf("fade limitado: %v, %v", bad.Cues[1].Fade, err)
 	}
 }

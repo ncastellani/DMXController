@@ -15,7 +15,7 @@ import (
 
 // Settings são as preferências de som, guardadas em config/som.yaml.
 type Settings struct {
-	LatencyMs int     `yaml:"latency_ms"` // atraso da saída compensado na luz
+	LatencyMs int     `yaml:"latency_ms"` // atraso da saída compensado na luz (negativo adianta a luz)
 	Volume    float64 `yaml:"volume"`     // volume do player (0..1)
 	Output    string  `yaml:"output"`     // saída preferida (id do sistema)
 	Speaker   string  `yaml:"speaker"`    // caixa Bluetooth a manter conectada
@@ -118,9 +118,10 @@ func (m *Manager) Settings() Settings {
 	return m.set
 }
 
-// SetLatency ajusta e guarda o atraso da saída.
+// SetLatency ajusta e guarda o atraso da saída (negativo: o som sai antes da
+// luz).
 func (m *Manager) SetLatency(ms int) {
-	ms = min(max(ms, 0), 1000)
+	ms = min(max(ms, -1000), 1000)
 	if m.player != nil {
 		m.player.SetLatency(time.Duration(ms) * time.Millisecond)
 	}

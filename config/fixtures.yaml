@@ -12,4 +12,5 @@ profiles:
       - speed  # 7: velocidade da função do canal 6 (lenta → rápida)
     fixed:
       mode: 0  # cores controladas pelos canais 1-4
-      speed: 0 # a confirmar na aba Manual: no modo 0-50 deve ser a velocidade do strobo
+      speed: 0
+    strobe_mode: 50 # canal 6 = 50 + canal 7 alto = strobo nativo (a fritação e o strobo da biblioteca)

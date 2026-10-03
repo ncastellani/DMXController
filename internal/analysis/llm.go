@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ncastellani/DMXController/internal/library"
 	"github.com/ncastellani/DMXController/internal/show"
 )
 
@@ -79,13 +80,10 @@ var fence = regexp.MustCompile("(?m)^```(json)?|```$")
 type prompt struct {
 	model, key string
 	temp       string // TempAuto, TempWarm, TempCold
-	lyrics     string // letra colada (sem a versão cantada, a IA casa com as partes)
-	sung       *sung  // letra transcrita da versão cantada, com tempos
+	free       bool   // modo livre: a IA pode criar efeitos no lugar dos presets
+	mixed      bool   // modo misto: presets e efeitos combinados na mesma música
+	lib        *library.Library
 }
-
-// colorsInLyrics diz se a letra pode trazer cores (aí as cenas de cor fixa
-// de qualquer temperatura e as cores novas valem).
-func (p prompt) colorsInLyrics() bool { return p.sung != nil || p.lyrics != "" }
 
 // tempRule explica ao modelo a temperatura pedida.
 func tempRule(temp string) string {
@@ -98,102 +96,102 @@ func tempRule(temp string) string {
 	return "- Temperatura das cores: livre — escolha a paleta pelo clima da música.\n"
 }
 
-// colorRule explica ao modelo como escolher a luz de uma cor citada.
-const colorRule = `use a cena de cor fixa da biblioteca mais parecida ("TODOS | ..." ou "CORES FIXAS"/"BIBLIOTECA DE CORES", camada base, cena, agitação fixa — pode ser de qualquer temperatura) em "preset". Se nenhuma cor da biblioteca corresponder (ex.: lilás, turquesa, salmão), crie a cor em "cor", em vez de "preset": {"nome": "LILÁS", "rgb": "#c8a2c8"} (RGB de LED: saturado e claro; nada perto de preto). A cor acende por alguns compassos e depois volta o preset da parte (o programa cuida dos tempos). Deixe de fora a cor que não faz sentido virar luz (ex.: "Branca" como nome de pessoa).`
+// beatRule pede atenção à batida dentro das partes.
+const beatRule = `- SIGA A BATIDA: a agitação da luz acompanha a "batida" tanto quanto a "energia". Uma parte de energia baixa com batida alta (ex.: verso de trap ou funk só com o beat e a voz) pede luz ritmada, de cortes secos e bem marcada, não fade lento. Uma parte com batida baixa pede luz mais contínua.
+- Grupos com "+" ou "-" (ex.: C- depois de C, D+ depois de D) são trechos da MESMA parte em que a percussão muda no meio: "+" = a bateria entra ou cresce, "-" = a bateria some ou recua (ex.: os compassos de respiro antes do refrão). Dê a esses trechos o mesmo nome da parte com o que mudou (ex.: "verso (bateria entra)", "refrão (respiro)") e MUDE a luz ali: mais agitada e contrastada no "+", mais parada e fechada no "-", de preferência com as mesmas cores da parte, para parecer uma variação e não outra música.
+`
 
-// lyricsBlock explica ao modelo como usar a letra (vazio sem letra). Com a
-// versão cantada, a letra vem transcrita com os tempos e as cores citadas já
-// têm o instante da palavra; só com a letra colada, não há tempos.
-func lyricsBlock(a *show.Analysis, p prompt) string {
-	if s := p.sung; s != nil {
-		part := func(t float64) int {
-			for i, sec := range a.Sections {
-				if t < sec.End {
-					return i
-				}
-			}
-			return len(a.Sections) - 1
-		}
-		var lines, colors strings.Builder
-		for _, l := range s.Lines {
-			fmt.Fprintf(&lines, "  %.1f–%.1fs (parte %d): %s\n", l.T, l.End, part(l.T), l.Text)
-		}
-		for _, m := range s.Colors {
-			fmt.Fprintf(&colors, "  %s: \"%s\" em %.1fs (parte %d), na frase \"%s\"\n", m.ID, m.Word, m.Time, part(m.Time), s.Lines[m.Line].Text)
-		}
-		out := `
-Letra cantada (transcrita da versão com voz; o cantor canta ao vivo por cima do playback, nestes mesmos tempos):
-` + lines.String() + `Uso da letra:
-- Use a letra para entender o clima e o tema e para nomear as partes (o refrão costuma ser o grupo que se repete).
+// partRule diz ao modelo como escolher a luz de cada parte; no modo livre,
+// ele pode criar um efeito em vez de usar um preset.
+func partRule(p prompt) string {
+	rule := beatRule + `- Para CADA parte, escolha um preset da camada "base" (de preferência sequências de pista; cenas de cor fixa só se a parte pedir luz parada). Partes do mesmo grupo devem, em geral, usar o mesmo preset, mas partes VIZINHAS com papéis diferentes (ex.: verso → refrão) devem mudar de preset, para a luz marcar a virada.
+- A agitação do preset deve acompanhar a energia e o clima da parte.
 `
-		if colors.Len() == 0 {
-			return out + "- A letra não cita cores: continue com sequências de pista em todas as partes.\n"
-		}
-		return out + `
-Cores citadas na letra (o instante é o da palavra):
-` + colors.String() + `- Para CADA cor citada, responda em "cores_citadas" com o "id" dela: ` + colorRule + `
-- Nas partes, continue escolhendo sequências de pista (a cor citada entra por cima, só na palavra).
-`
+	if !p.free {
+		return rule
 	}
-	if p.lyrics == "" {
+	return beatRule + `- MODO LIVRE: você cria a luz desta música, com a mesma riqueza das sequências de pista prontas (elas têm de 12 a 24 passos, 4 a 6 cores e "frases" que mudam o tempo todo). Para CADA parte, crie um efeito em "efeito" (sem "preset") ou, onde uma sequência pronta servir melhor (ex.: a parte mais agitada), use um preset da camada "base" em "preset" (sem "efeito"). Prefira os efeitos: a ideia é a música ter uma luz própria, pensada para o clima dela.
+- Em quase todas as partes o efeito deve ser uma SEQUÊNCIA escrita por você: {"tipo": "sequence", "fade": true|false, "intensidade": 0.4 a 1, "passos": [[esquerda, centro, direita], ...]}.
+  - Os passos avançam sozinhos A CADA TOQUE FORTE DA MÚSICA (batida da bateria, palhetada da guitarra, entrada de um acorde), detectado pelo programa no áudio: você não escolhe a duração do passo. Nas partes cheias isso dá uma troca por batida, mais ou menos; nas calmas, as trocas acompanham os toques mais espaçados.
+  - Cada passo tem as 3 cores "#rrggbb" dos canhões (esquerda, centro, direita). Cores de LED: saturadas e claras. SEM EXTREMOS: nenhum canhão branco, nenhum canhão apagado ("#000000") e nenhum tom escuro (o maior canal de cada cor fica de 128 para cima); o contraste vem de mudar de cor, não de apagar.
+  - De 8 a 24 passos, tocados em loop. Monte a sequência em FRASES de 2 a 4 passos e mude de frase várias vezes, como as sequências prontas fazem: rodízio de 3 cores entre os canhões; dois tons alternando (A B A → B A B); um canhão numa cor viva por vez com os outros dois num tom mais fechado da mesma cor; os 3 iguais trocando de cor; tom fechado → tom vivo da mesma cor; laterais numa cor e centro em outra. NÃO use branco ("#ffffff") nas sequências: o branco é reservado aos picos da música, em que o programa já dá sozinho um flash branco no canhão do centro.
+  - Use de 4 a 6 cores por sequência (não só 2), combinando com o clima; para segurar um quadro por dois toques, repita o passo.
+  - Partes calmas: "fade": true (cada passo se transforma no seguinte), mudando um canhão de cada vez e com cores vizinhas, para a troca a cada toque ficar suave. Partes agitadas: cortes secos e contraste alto entre um passo e o seguinte.
+  - Exemplo (parte agitada, 16 passos): [["#ff2878","#ff00ff","#0000ff"],["#0000ff","#ff2878","#ff00ff"],["#ff00ff","#0000ff","#ff2878"],["#ff0064","#00ffff","#ff0064"],["#00ffff","#ff0064","#00ffff"],["#7800ff","#3c0080","#3c0080"],["#3c0080","#7800ff","#3c0080"],["#3c0080","#3c0080","#7800ff"],["#b41c55","#b41c55","#b41c55"],["#ff2878","#ff2878","#ff2878"],["#ff2878","#00ffff","#ff2878"],["#00ffff","#0000ff","#00ffff"],["#0000ff","#00ffff","#0000ff"],["#ff0064","#7800ff","#00ffff"],["#00ffff","#ff0064","#7800ff"],["#7800ff","#00ffff","#ff0064"]]. Não copie: crie as suas.
+- Efeitos simples (só para momentos pontuais, como um final parado; também trocam a cada toque): {"tipo", "cores", "intensidade"} com "tipo": "fixed" (cores paradas: 1 cor = os 3 canhões iguais; 3 cores = esquerda, centro, direita), "pulse" (as cores acendem forte a cada toque e caem suave), "fade" (2 a 4 cores se transformando uma na outra), "alternate" (os canhões trocam de cor entre si), "chase" (a 1ª cor corre de um canhão ao outro sobre a 2ª).
+- Partes do mesmo grupo devem, em geral, repetir a mesma sequência, mas partes VIZINHAS com papéis diferentes (ex.: verso → refrão) devem mudar bastante (cores e frases), para a luz marcar a virada. A música inteira deve ter uma paleta coerente (5 a 7 cores no total), com o refrão mais vivo e mais variado.
+- O efeito nunca pisca rápido: fritação e strobo continuam só nos acentos.
+` + libRule(p) + mixRule(p)
+}
+
+// mixRule pede a combinação do modo misto.
+func mixRule(p prompt) string {
+	if !p.mixed {
 		return ""
 	}
-	return `
-Letra da música (colada pela equipe). ATENÇÃO: a voz principal é cantada AO VIVO e NÃO está no áudio — o playback só tem instrumental e vozes de fundo. Então use a letra para entender o clima e o tema e para casar versos/refrão com as partes detectadas (o refrão costuma ser o grupo que se repete), não para achar tempos exatos.
-"""
-` + p.lyrics + `
-"""
-Uso da letra:
-- Diga em "letra" (em cada seção) o trecho da letra que você acha que cai naquela parte (curto, opcional).
-- Se a letra CITAR uma cor (ex.: "vestido vermelho", "céu azul", "verde-limão"), marque em "cores_citadas" a parte em que ela é cantada ("parte": índice) e a "palavra": ` + colorRule + ` Sem a versão cantada não se sabe o segundo da palavra, então a cor acende no início da parte.
-- Nas partes, continue escolhendo sequências de pista (a cor citada entra por cima).
+	return `- MODO MISTO (vale no lugar de "prefira os efeitos"): esta música combina os dois. Pelo menos um terço das partes com "preset" (modos de pista prontos, que tocam com os tempos e as rajadas deles: bons para as partes mais agitadas e para marcar o refrão) e pelo menos um terço com "efeito" (sequências suas ou modos de pista com cores novas: dão à música uma cor própria). Sempre que der, partes vizinhas alternam entre preset e efeito. Escolha presets cujas cores conversem com a paleta dos seus efeitos.
 `
 }
 
-// colorsFormat é o trecho do formato da resposta para as cores citadas.
-func colorsFormat(p prompt) string {
-	switch {
-	case p.sung != nil && len(p.sung.Colors) > 0:
-		return `,
-  "cores_citadas": [{"id": "c0", "preset": "qlc:NN", "motivo": "curto"}, {"id": "c1", "cor": {"nome": "LILÁS", "rgb": "#c8a2c8"}, "motivo": "curto"}]`
-	case p.sung == nil && p.lyrics != "":
-		return `,
-  "cores_citadas": [{"parte": 0, "palavra": "verde-limão", "preset": "qlc:NN", "motivo": "curto"}]`
+// libRule apresenta ao modelo os modos de pista como efeitos (que ele pode
+// usar como estão ou com outra paleta) e as cores nomeadas.
+func libRule(p prompt) string {
+	if len(usable(p.lib)) == 0 {
+		return ""
 	}
-	return ""
+	rule := `- MODOS DE PISTA COMO EFEITO (lista "Desenho dos modos de pista" abaixo): em vez de escrever os passos, você pode levar o desenho de um modo de pista para a parte, em "efeito": {"modelo": "pista:nome"} (cores originais) ou {"modelo": "pista:nome", "cores": ["#rrggbb", ...]} para manter o desenho e trocar a paleta: a 1ª cor da lista entra no lugar de A, a 2ª no de B etc. (dê uma cor para cada letra). Como efeito, os passos todos brancos (WWW) ou todos apagados (---) do desenho são retirados e um canhão apagado ganha um tom fechado da cor do passo. Como efeito, os passos trocam a cada toque da música, como nas suas sequências; em "preset", o mesmo modo toca com os tempos próprios dele (inclusive rajadas rápidas). Trocar a paleta é a melhor forma de aproveitar um desenho bom com as cores desta música.
+  - Em "passos", cada grupo de 3 letras é um passo (esquerda, centro, direita); W = branco, - = apagado. O "clima" de cada um vai de 0 a 1 em energia (parado → explosivo), alegria (sombrio → alegre), tensão (tranquilo → dramático) e romance (frio → íntimo): escolha os de clima parecido com o de cada parte.
+  - Varie: numa música, misture sequências escritas por você, modos de pista com cores novas e, no máximo em 1 ou 2 partes, modos de pista com as cores originais. Não use o mesmo desenho em partes de papéis diferentes.
+`
+	if pal := paletteText(p.lib, p.temp); pal != "" {
+		rule += "- PALETA DO SHOW (cores testadas nestes canhões; prefira estes valores quando escrever cores, eles saem mais fiéis que outros tons): " + pal + ".\n"
+	}
+	return rule
 }
 
 // askLLM pede ao modelo (ouvindo a faixa) os nomes, o clima e as escolhas.
 func askLLM(ctx context.Context, y []float64, a *show.Analysis, cat []Preset, p prompt) (*choices, string, error) {
 	var offer []Preset // só o que a validação vai aceitar
 	for _, pr := range cat {
-		if pr.Fits(p.temp) || p.colorsInLyrics() && pr.Kind == "cena" && pr.Agitacao == "fixa" {
+		if pr.Fits(p.temp) {
 			offer = append(offer, pr)
 		}
 	}
 	secs, presets := describe(a, offer)
+	pulseNote := "batida = força da percussão, de 0 a 1"
+	if a.Drums {
+		pulseNote = `batida = nível da bateria de 0 a 1, medido com a bateria isolada do resto da música; "sem bateria" = ela não toca naquela parte, e a luz deve ser contínua (fades, trocas suaves) mesmo que a energia seja alta`
+	}
+	freeFormat, score := "", ""
+	if p.free && len(usable(p.lib)) > 0 {
+		presets += "\nDesenho dos modos de pista (só no modo livre, em \"efeito\": {\"modelo\": ...}):\n" + describeLibrary(p.lib, p.temp)
+		score = `
+  "clima_pontos": {"energia": 0 a 1, "alegria": 0 a 1, "tensao": 0 a 1, "romance": 0 a 1},`
+		freeFormat = `, {"indice": 2, "nome": "verso", "efeito": {"modelo": "pista:nome", "cores": ["#rrggbb", "#rrggbb", "#rrggbb"]}, "motivo": "curto"}`
+	}
+	if p.free {
+		freeFormat = `, {"indice": 1, "nome": "refrão", "efeito": {"tipo": "sequence", "fade": false, "intensidade": 1, "passos": [["#rrggbb", "#rrggbb", "#rrggbb"], ["#rrggbb", "#rrggbb", "#rrggbb"]]}, "motivo": "curto"}` + freeFormat
+	}
 	text := fmt.Sprintf(`Você é iluminador de um show pequeno: um cantor ao vivo sobre playback, com 3 canhões LED RGB (esquerda, centro, direita).
 Ouça a faixa e use a análise abaixo (feita por software, os tempos são exatos — não invente tempos fora da grade).
 
 BPM detectado: %.1f (pode estar no dobro/metade do andamento percebido)
 Duração: %.1fs
-Partes detectadas (grupo = partes parecidas entre si, ex.: refrões):
+Partes detectadas (grupo = partes parecidas entre si, ex.: refrões; energia = volume; %s):
 %s
 Presets disponíveis (use SÓ estes ids):
-%s%s
+%s
 Regras:
-- Para CADA parte, escolha um preset da camada "base" (de preferência sequências de pista; cenas de cor fixa só se a parte pedir luz parada). Partes do mesmo grupo devem, em geral, usar o mesmo preset, mas partes VIZINHAS com papéis diferentes (ex.: verso → refrão) devem mudar de preset, para a luz marcar a virada.
-- A agitação do preset deve acompanhar a energia e o clima da parte.
-%s- Acentos (opcionais, no máximo 1 a cada 20 s): presets da camada "flash" em momentos de impacto (drop, virada, entrada do refrão), duração de 1 a 4 batidas. "FRITAÇÃO | BRANCO MÁXIMO" é o efeito mais agressivo: use no máximo uma vez, só no ápice da música.
+%s%s- Acentos (opcionais, no máximo 1 a cada 20 s): presets da camada "flash" em momentos de impacto (drop, virada, entrada do refrão), duração de 1 a 4 batidas. "FRITAÇÃO | BRANCO MÁXIMO" é o efeito mais agressivo: use no máximo uma vez, só no ápice da música.
 - Responda APENAS com JSON neste formato:
 {
   "genero": "...", "clima": "...", "descricao": "1-2 frases",
   "bpm_percebido": numero,
-  "intensidade": numero de 0 a 1,
+  "intensidade": numero de 0 a 1,%s
   "paleta": ["nomes de cores do catálogo"],
-  "secoes": [{"indice": 0, "nome": "intro|verso|pré-refrão|refrão|ponte|solo|final|...", "preset": "qlc:NN", "letra": "trecho (opcional)", "motivo": "curto"}],
-  "acentos": [{"tempo": segundos, "preset": "qlc:NN", "duracao_batidas": 1, "motivo": "curto"}]%s
-}`, a.BPM, a.Duration, secs, presets, lyricsBlock(a, p), tempRule(p.temp), colorsFormat(p))
+  "secoes": [{"indice": 0, "nome": "intro|verso|pré-refrão|refrão|ponte|solo|final|...", "preset": "id da lista", "motivo": "curto"}%s],
+  "acentos": [{"tempo": segundos, "preset": "id da lista", "duracao_batidas": 1, "motivo": "curto"}]
+}`, a.BPM, a.Duration, pulseNote, secs, presets, partRule(p), tempRule(p.temp), score, freeFormat)
 
 	answer, usage, err := chat(ctx, p, 0.4, []any{
 		map[string]any{"type": "text", "text": text},

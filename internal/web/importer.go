@@ -14,14 +14,19 @@ import (
 	"unicode"
 
 	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/library"
 )
 
 // Importer recebe faixas .wav pela interface e gera a timeline de cada uma.
 type Importer struct {
 	Dir     string            // pasta da setlist
 	Catalog []analysis.Preset // presets disponíveis para o coreógrafo
-	APIKey  string            // OpenRouter; vazio = só regras
-	Model   string
+	Library *library.Library  // modos de pista e cores para o modo livre
+	// Separator é o ouvido de bateria (nil = não instalado: a batida é
+	// estimada na música inteira).
+	Separator *analysis.Separator
+	APIKey    string // OpenRouter; vazio = só regras
+	Model     string
 }
 
 const (
@@ -33,9 +38,9 @@ type job struct {
 	ID      int    `json:"id"`
 	File    string `json:"file"`
 	AI      bool   `json:"ai"`
-	Temp    string `json:"temp"`   // auto | quente | fria
-	Lyrics  bool   `json:"lyrics"` // há letra colada para a IA
-	Voice   bool   `json:"voice"`  // há versão cantada (X.voz.wav) para a IA
+	Temp    string `json:"temp"` // auto | quente | fria
+	Free    bool   `json:"free"` // modo livre: efeitos criados para a música
+	Mix     bool   `json:"mix"`  // modo misto: presets e efeitos combinados
 	Stage   string `json:"stage"`
 	Done    bool   `json:"done"`
 	Error   string `json:"error,omitempty"`
@@ -44,7 +49,8 @@ type job struct {
 
 type jobsMsg struct {
 	Type  string `json:"type"`
-	AI    bool   `json:"ai"` // há chave do OpenRouter
+	AI    bool   `json:"ai"`  // há chave do OpenRouter
+	Ear   bool   `json:"ear"` // o ouvido de bateria está instalado
 	Items []job  `json:"items"`
 }
 
@@ -58,6 +64,7 @@ func (s *Server) jobsMsg() jobsMsg {
 	m := jobsMsg{Type: "jobs", Items: []job{}}
 	if s.importer != nil {
 		m.AI = s.importer.APIKey != ""
+		m.Ear = s.importer.Separator != nil
 	}
 	for _, j := range s.jobs {
 		m.Items = append(m.Items, *j)
@@ -93,24 +100,27 @@ func (s *Server) importWorker(ctx context.Context) {
 func (s *Server) runJob(ctx context.Context, j *job) {
 	imp := s.importer
 	wav := filepath.Join(imp.Dir, j.File)
-	key, lyrics, voice := "", "", ""
+	key := ""
 	if j.AI {
 		key = imp.APIKey
-		if data, err := os.ReadFile(lyricsPath(wav)); err == nil {
-			lyrics = string(data)
-		}
-		if j.Voice {
-			voice = analysis.VoicePath(wav)
-		}
 	}
 	t, warn, err := analysis.Generate(ctx, wav, imp.Catalog, analysis.Options{
-		APIKey: key, Model: imp.Model, Temperature: j.Temp, Lyrics: lyrics, Voice: voice,
+		APIKey: key, Model: imp.Model, Temperature: j.Temp, Free: j.Free, Mixed: j.Mix, Library: imp.Library, Separator: imp.Separator,
 		Progress: func(stage string) { s.updateJob(j, func() { j.Stage = stage }) },
 	})
 	jsonPath := strings.TrimSuffix(wav, filepath.Ext(wav)) + ".json"
 	if err == nil {
 		if err = analysis.Save(t, jsonPath); err == nil {
 			os.Remove(jsonPath + ".orig") // edições da versão anterior não valem mais
+		}
+	}
+	if err == nil {
+		// Antes de dar a análise por pronta: quem vê "pronta" já encontra a
+		// música na setlist. Reanálise da música carregada (ou já emendada)
+		// vale na hora.
+		s.show.Scan()
+		if uerr := s.show.Update(jsonPath, t); uerr != nil {
+			s.ctl.Notice("♪ %s: %v", t.Song.Title, uerr)
 		}
 	}
 	s.updateJob(j, func() {
@@ -125,28 +135,14 @@ func (s *Server) runJob(ctx context.Context, j *job) {
 		s.ctl.Notice("♪ análise de %s falhou: %v", j.File, err)
 		return
 	}
-	s.show.Scan()
-	// Reanálise da música carregada (ou já emendada): vale na hora.
-	if err := s.show.Update(jsonPath, t); err != nil {
-		s.ctl.Notice("♪ %s: %v", t.Song.Title, err)
-	}
 	s.sendSongTimeline(jsonPath, t)
 	s.sendSetlist()
 	s.ctl.Notice("♪ timeline pronta: %s", t.Song.Title)
 }
 
-// lyricsPath é onde fica a letra de X.wav (X.letra.txt).
-func lyricsPath(wav string) string {
-	return strings.TrimSuffix(wav, filepath.Ext(wav)) + ".letra.txt"
-}
-
-// maxLyricsFile é o tamanho máximo da letra guardada (bytes).
-const maxLyricsFile = 64 << 10
-
 // analyze põe na fila a análise de uma faixa que já está na pasta (nova ou
-// reanálise), guardando antes a letra, se veio. lyrics nil = manter a que
-// já existe; "" = apagar. noVoice apaga a versão cantada (X.voz.wav).
-func (s *Server) analyze(file string, ai bool, temp string, lyrics *string, noVoice bool) error {
+// reanálise). free = modo livre; mix = modo misto (presets e efeitos).
+func (s *Server) analyze(file string, ai bool, temp string, free, mix bool) error {
 	if s.importer == nil {
 		return errors.New("análise de músicas desligada")
 	}
@@ -158,57 +154,16 @@ func (s *Server) analyze(file string, ai bool, temp string, lyrics *string, noVo
 	if !exists(wav) {
 		return fmt.Errorf("%s não está na pasta de músicas", name)
 	}
-	if noVoice {
-		if err := os.Remove(analysis.VoicePath(wav)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-	}
-	if lyrics != nil {
-		text := strings.TrimSpace(strings.ReplaceAll(*lyrics, "\r\n", "\n"))
-		if len(text) > maxLyricsFile {
-			return errors.New("letra grande demais")
-		}
-		if text == "" {
-			os.Remove(lyricsPath(wav))
-		} else if err := os.WriteFile(lyricsPath(wav), []byte(text+"\n"), 0o644); err != nil {
-			return err
-		}
-	}
-	s.enqueue(name, ai, temp)
+	s.enqueue(name, ai, temp, free, mix)
 	return nil
 }
 
-// serveLyrics devolve a letra guardada de uma faixa:
-// GET /api/lyrics?file=<arquivo.wav> (vazio se não houver).
-func (s *Server) serveLyrics(w http.ResponseWriter, r *http.Request) {
-	if s.importer == nil {
-		http.Error(w, "análise de músicas desligada", http.StatusServiceUnavailable)
-		return
-	}
-	name, err := cleanName(r.URL.Query().Get("file"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	data, err := os.ReadFile(lyricsPath(filepath.Join(s.importer.Dir, name)))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Write(data)
-}
-
 // enqueue põe uma faixa na fila de análise.
-func (s *Server) enqueue(file string, ai bool, temp string) {
+func (s *Server) enqueue(file string, ai bool, temp string, free, mix bool) {
 	s.mu.Lock()
 	s.nextJob++
 	ai = ai && s.importer.APIKey != ""
-	j := &job{ID: s.nextJob, File: file, AI: ai, Temp: analysis.NormTemp(temp), Stage: "na fila"}
-	wav := filepath.Join(s.importer.Dir, file)
-	j.Lyrics = ai && exists(lyricsPath(wav))
-	j.Voice = ai && exists(analysis.VoicePath(wav))
+	j := &job{ID: s.nextJob, File: file, AI: ai, Temp: analysis.NormTemp(temp), Free: free || mix, Mix: mix, Stage: "na fila"}
 	s.jobs = append(s.jobs, j)
 	if len(s.jobs) > keepJobs {
 		s.jobs = s.jobs[len(s.jobs)-keepJobs:]
@@ -219,10 +174,9 @@ func (s *Server) enqueue(file string, ai bool, temp string) {
 }
 
 // serveUpload recebe um .wav no corpo da requisição:
-// POST /api/upload?name=<arquivo.wav>&ia=1&temp=quente&replace=1
+// POST /api/upload?name=<arquivo.wav>&ia=1&temp=quente&livre=1&replace=1
 // Com analisar=0 só guarda o arquivo (a análise vem depois, pela mensagem
-// analyze, com a letra). Com voz=1, o arquivo é a versão cantada da faixa
-// name (gravada como X.voz.wav, substituindo a anterior, sem analisar).
+// analyze).
 func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "use POST", http.StatusMethodNotAllowed)
@@ -247,23 +201,6 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	dir := s.importer.Dir
 	wav := filepath.Join(dir, name)
-	if q.Get("voz") == "1" {
-		if !exists(wav) {
-			http.Error(w, fmt.Sprintf("envie primeiro o playback %q", name), http.StatusBadRequest)
-			return
-		}
-		if err := receive(http.MaxBytesReader(w, r.Body, maxUpload), dir, analysis.VoicePath(wav)); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		s.sendSetlist()
-		writeAccepted(w, name)
-		return
-	}
-	if strings.HasSuffix(strings.ToLower(name), analysis.VoiceSuffix) {
-		http.Error(w, "nomes terminados em .voz.wav são das versões cantadas: renomeie o arquivo", http.StatusBadRequest)
-		return
-	}
 	jsonPath := strings.TrimSuffix(wav, filepath.Ext(wav)) + ".json"
 	// Um .wav sem timeline (envio anterior que não chegou a ser analisado)
 	// pode ser substituído sem perguntar.
@@ -276,7 +213,7 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if q.Get("analisar") != "0" {
-		s.enqueue(name, q.Get("ia") == "1", q.Get("temp"))
+		s.enqueue(name, q.Get("ia") == "1", q.Get("temp"), q.Get("livre") == "1", q.Get("misto") == "1")
 	}
 	writeAccepted(w, name)
 }

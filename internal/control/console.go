@@ -12,7 +12,7 @@ import (
 
 	"github.com/ncastellani/DMXController/internal/engine"
 	"github.com/ncastellani/DMXController/internal/fixture"
-	"github.com/ncastellani/DMXController/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/library"
 )
 
 // Teclas fixas dos atalhos da interface web (não podem ser usadas por botões).
@@ -21,17 +21,17 @@ const (
 	KeyStopStrobe = 'b'
 )
 
-// Button é um botão do console já resolvido para uma Function.
+// Button é um botão do console já resolvido para um preset da biblioteca.
 type Button struct {
-	ID       int // índice em Console.Buttons
-	Caption  string
-	Color    string // cor do botão no QLC+ ("#rrggbb"), opcional
-	Group    string
-	Layer    engine.Layer
-	Key      byte // atalho de teclado na interface web; 0 se não tem
-	Function int  // ID da Function no workspace do QLC+
-	Name     string
-	Src      engine.Source
+	ID      int // índice em Console.Buttons
+	Caption string
+	Color   string // cor do botão na interface ("#rrggbb"), opcional
+	Group   string
+	Layer   engine.Layer
+	Key     byte   // atalho de teclado na interface web; 0 se não tem
+	Preset  string // id do preset na biblioteca ("pista:club")
+	Name    string // nome de exibição do preset ("PISTA | CLUB")
+	Src     engine.Source
 }
 
 // Label é como o botão aparece nos eventos.
@@ -44,15 +44,13 @@ type Console struct {
 	Groups  []string
 	Buttons []*Button
 	Limits  struct{ Flash, Strobe time.Duration }
-	// Workspace é o workspace do QLC+ de onde vêm as Functions.
-	Workspace *qlc.Workspace
-	// Skipped lista Functions do workspace que não puderam ser carregadas.
-	Skipped []string
+	// Library é a biblioteca de onde vêm os presets.
+	Library *library.Library
 }
 
 type consoleFile struct {
-	Workspace string `yaml:"workspace"`
-	Limits    struct {
+	Library string `yaml:"library"`
+	Limits  struct {
 		Flash  time.Duration `yaml:"flash"`
 		Strobe time.Duration `yaml:"strobe"`
 	} `yaml:"limits"`
@@ -60,10 +58,10 @@ type consoleFile struct {
 		Name    string `yaml:"name"`
 		Layer   string `yaml:"layer"`
 		Buttons []struct {
-			Caption  string `yaml:"caption"`
-			Function int    `yaml:"function"`
-			Key      string `yaml:"key"`
-			Color    string `yaml:"color"`
+			Caption string `yaml:"caption"`
+			Preset  string `yaml:"preset"`
+			Key     string `yaml:"key"`
+			Color   string `yaml:"color"`
 		} `yaml:"buttons"`
 	} `yaml:"groups"`
 }
@@ -72,9 +70,10 @@ var layers = map[string]engine.Layer{
 	"base": engine.Base, "strobe": engine.Strobe, "flash": engine.Flash,
 }
 
-// LoadConsole lê o console e o workspace do QLC+ que ele referencia
-// (caminho relativo ao arquivo do console).
-func LoadConsole(path string) (*Console, error) {
+// LoadConsole lê o console e a biblioteca que ele referencia (caminho
+// relativo ao arquivo do console). positions são os canhões com endereço
+// lógico, onde os presets são desenhados.
+func LoadConsole(path string, positions []*fixture.Fixture) (*Console, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -83,22 +82,22 @@ func LoadConsole(path string) (*Console, error) {
 	if err := yaml.Unmarshal(data, &cf); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	ws, err := qlc.Load(filepath.Join(filepath.Dir(path), cf.Workspace))
+	if cf.Library == "" {
+		return nil, fmt.Errorf("%s: falta library (o arquivo da biblioteca de presets)", path)
+	}
+	lib, err := library.Load(filepath.Join(filepath.Dir(path), cf.Library))
 	if err != nil {
 		return nil, err
 	}
-	c, err := build(&cf, ws)
+	c, err := build(&cf, lib, positions)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return c, nil
 }
 
-func build(cf *consoleFile, ws *qlc.Workspace) (*Console, error) {
-	c := &Console{
-		Workspace: ws,
-		Skipped:   ws.Skipped,
-	}
+func build(cf *consoleFile, lib *library.Library, positions []*fixture.Fixture) (*Console, error) {
+	c := &Console{Library: lib}
 	c.Limits.Flash, c.Limits.Strobe = cf.Limits.Flash, cf.Limits.Strobe
 	if c.Limits.Flash <= 0 || c.Limits.Strobe <= 0 {
 		return nil, fmt.Errorf("limits.flash e limits.strobe são obrigatórios")
@@ -113,11 +112,11 @@ func build(cf *consoleFile, ws *qlc.Workspace) (*Console, error) {
 		}
 		c.Groups = append(c.Groups, g.Name)
 		for _, b := range g.Buttons {
-			name, src, ok := ws.Function(b.Function)
+			name, src, ok := lib.Preset(b.Preset, positions)
 			if !ok {
-				return nil, fmt.Errorf("botão %q: function %d não existe ou não é suportada", b.Caption, b.Function)
+				return nil, fmt.Errorf("botão %q: preset %q não existe na biblioteca", b.Caption, b.Preset)
 			}
-			btn := &Button{ID: len(c.Buttons), Caption: b.Caption, Color: b.Color, Group: g.Name, Layer: layer, Function: b.Function, Name: name, Src: src}
+			btn := &Button{ID: len(c.Buttons), Caption: b.Caption, Color: b.Color, Group: g.Name, Layer: layer, Preset: lib.Canonical(b.Preset), Name: name, Src: src}
 			switch {
 			case b.Key == "":
 			case len(b.Key) != 1 || b.Key[0] <= ' ' || b.Key[0] > '~':
@@ -136,19 +135,24 @@ func build(cf *consoleFile, ws *qlc.Workspace) (*Console, error) {
 	return c, nil
 }
 
-// NewRig liga as posições do patch aos fixtures do workspace do QLC+ (o
-// fixture de ID 0 é a primeira posição, e assim por diante).
-func NewRig(fixtures []*fixture.Fixture, c *Console, patchPath string) (*fixture.Rig, error) {
-	ws := c.Workspace.Fixtures
-	if len(ws) != len(fixtures) {
-		return nil, fmt.Errorf("o workspace do QLC+ tem %d fixtures e o patch tem %d", len(ws), len(fixtures))
-	}
-	logical := make([]int, len(ws))
-	for i, f := range ws {
-		if n := len(fixtures[i].Profile.Channels); n != f.Channels {
-			return nil, fmt.Errorf("posição %q tem %d canais no perfil, mas %q no QLC+ tem %d", fixtures[i].Name, n, f.Name, f.Channels)
-		}
-		logical[i] = f.Address
+// NewRig monta o rig: no quadro lógico (onde os presets são desenhados), as
+// posições do patch ocupam blocos seguidos a partir do canal 1 (esquerda em
+// 1, centro em 8, direita em 15, com 7 canais cada).
+func NewRig(fixtures []*fixture.Fixture, patchPath string) (*fixture.Rig, error) {
+	logical := make([]int, len(fixtures))
+	next := 1
+	for i, f := range fixtures {
+		logical[i] = next
+		next += len(f.Profile.Channels)
 	}
 	return fixture.NewRig(fixtures, logical, patchPath)
+}
+
+// Positions devolve os canhões do rig com o endereço lógico.
+func Positions(rig *fixture.Rig) []*fixture.Fixture {
+	var out []*fixture.Fixture
+	for i := range rig.Fixtures {
+		out = append(out, rig.Logical(i))
+	}
+	return out
 }

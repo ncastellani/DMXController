@@ -9,9 +9,6 @@ package main
 //	DMXController analisar musicas/x.wav       uma faixa
 //
 // Um JSON existente não é sobrescrito (pode ter edições), a não ser com -forcar.
-// Se existir X.voz.wav (a versão cantada) ao lado de X.wav, a IA transcreve a
-// letra dela e a cor citada acende na palavra; X.letra.txt (letra colada)
-// ajuda a transcrever ou, sem a versão cantada, é casada com as partes.
 
 import (
 	"context"
@@ -36,6 +33,10 @@ func analisar(args []string) error {
 	model := flag.String("modelo", analysis.DefaultModel, "modelo do OpenRouter")
 	force := flag.Bool("forcar", false, "sobrescreve JSONs existentes")
 	temp := flag.String("temperatura", analysis.TempAuto, "cores: auto | quente | fria")
+	free := flag.Bool("livre", false, "modo livre: cria efeitos para a música (misturados aos presets) em vez de usar só os presets")
+	earDir := flag.String("ouvido", ".ouvido", "pasta do ouvido de bateria (instale com scripts/instalar_ouvido.sh)")
+	noEar := flag.Bool("sem-ouvido", false, "não separa a bateria (a batida é estimada na música inteira)")
+	mixed := flag.Bool("misto", false, "modo misto: combina presets e efeitos na mesma música (cada um em pelo menos um terço das partes)")
 	flag.Parse(args)
 	if flag.NArg() == 0 {
 		fmt.Fprintln(os.Stderr, "uso: DMXController analisar [opções] <pasta ou arquivo.wav>...")
@@ -47,20 +48,22 @@ func analisar(args []string) error {
 	if err != nil {
 		return err
 	}
-	console, err := control.LoadConsole(*consolePath)
+	rig, err := control.NewRig(fixtures, *patch)
 	if err != nil {
 		return err
 	}
-	rig, err := control.NewRig(fixtures, console, *patch)
+	console, err := control.LoadConsole(*consolePath, control.Positions(rig))
 	if err != nil {
 		return err
 	}
-	var positions []*fixture.Fixture
-	for i := range rig.Fixtures {
-		positions = append(positions, rig.Logical(i))
-	}
-	cat := analysis.Catalog(console, positions)
+	cat := analysis.Catalog(console)
 
+	var sep *analysis.Separator
+	if !*noEar {
+		if sep = analysis.FindSeparator(*earDir); sep == nil {
+			log.Print("aviso: sem o ouvido de bateria (scripts/instalar_ouvido.sh); a batida será estimada na música inteira")
+		}
+	}
 	key := ""
 	if !*noAI {
 		if key = analysis.APIKey(".env"); key == "" {
@@ -72,11 +75,7 @@ func analisar(args []string) error {
 	for _, arg := range flag.Args() {
 		if st, err := os.Stat(arg); err == nil && st.IsDir() {
 			m, _ := filepath.Glob(filepath.Join(arg, "*.wav"))
-			for _, f := range m {
-				if !strings.HasSuffix(f, analysis.VoiceSuffix) {
-					files = append(files, f)
-				}
-			}
+			files = append(files, m...)
 		} else {
 			files = append(files, arg)
 		}
@@ -88,18 +87,8 @@ func analisar(args []string) error {
 			continue
 		}
 		fmt.Printf("%s:\n", filepath.Base(wav))
-		lyrics, _ := os.ReadFile(strings.TrimSuffix(wav, filepath.Ext(wav)) + ".letra.txt")
-		if len(lyrics) > 0 && key != "" {
-			fmt.Println("  usando a letra colada")
-		}
-		voice := analysis.VoicePath(wav)
-		if _, err := os.Stat(voice); err != nil {
-			voice = ""
-		} else {
-			fmt.Println("  usando a versão cantada")
-		}
 		t, warn, err := analysis.Generate(context.Background(), wav, cat, analysis.Options{
-			APIKey: key, Model: *model, Temperature: *temp, Lyrics: string(lyrics), Voice: voice,
+			APIKey: key, Model: *model, Temperature: *temp, Free: *free, Mixed: *mixed, Library: console.Library, Separator: sep,
 			Progress: func(s string) { fmt.Println("  " + s) },
 		})
 		if err != nil {

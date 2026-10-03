@@ -1,0 +1,939 @@
+# Biblioteca de luz do DMXController: as cores, os strobos e os modos de pista
+# que os botões do console (console.yaml), as timelines das músicas e a análise
+# usam. Pode ser editada à mão; o programa lê ao iniciar.
+#
+# Tom: "#rrggbb" (dimmer no máximo; #000000 = apagado) ou "#rrggbb@180" (a cor
+# com o dimmer em 180 de 255).
+#
+# colors:  cores fixas nos 3 canhões.
+# strobes: strobo nativo do canhão (speed = canal de velocidade); a fritação
+#          e o strobo contínuo do console.
+# effects: modos de pista. steps = um passo por linha, os tons de esquerda,
+#          centro e direita, tocados em loop; "350ms" = duração só daquele
+#          passo (sem isso vale step_ms); "fade900ms" = o passo entra em fade.
+#   agitation: calma | media | agitada      temp: quente | fria | mista | neutra
+#   mood:      clima de 0 a 1 (energy = parado → explosivo, joy = sombrio →
+#              alegre, tension = tranquilo → dramático, romance = frio →
+#              íntimo), avaliado pela IA ("DMXController biblioteca").
+# alias:   id antigo, do tempo do QLC+; as timelines que o usam continuam
+#          abrindo.
+
+colors:
+    - {id: 'todos:amarelo', name: AMARELO, hex: '#ff6400', temp: quente, alias: 'qlc:7'}
+    - {id: 'todos:azul', name: AZUL, hex: '#0000ff', temp: fria, alias: 'qlc:1'}
+    - {id: 'todos:azul-claro', name: AZUL CLARO, hex: '#0064ff', temp: fria, alias: 'qlc:11'}
+    - {id: 'todos:azul-profundo', name: AZUL PROFUNDO, hex: '#0000a0', temp: fria, alias: 'qlc:12'}
+    - {id: 'todos:bordo', name: BORDÔ, hex: '#ff0014@180', temp: quente, alias: 'qlc:23'}
+    - {id: 'todos:branco', name: BRANCO, hex: '#ffffff', temp: neutra, alias: 'qlc:6'}
+    - {id: 'todos:ciano', name: CIANO, hex: '#00ffff', temp: fria, alias: 'qlc:8'}
+    - {id: 'todos:dourado', name: DOURADO, hex: '#ff5000', temp: quente, alias: 'qlc:17'}
+    - {id: 'todos:dourado-suave', name: DOURADO SUAVE, hex: '#ff5000@100', temp: quente, alias: 'qlc:28'}
+    - {id: 'todos:fogo', name: FOGO, hex: '#ff1e00', temp: quente, alias: 'qlc:25'}
+    - {id: 'todos:laranja', name: LARANJA, hex: '#ff3c00', temp: quente, alias: 'qlc:5'}
+    - {id: 'todos:laranja-queimado', name: LARANJA QUEIMADO, hex: '#ff1900', temp: quente, alias: 'qlc:20'}
+    - {id: 'todos:magenta', name: MAGENTA, hex: '#ff0064', alias: 'qlc:13'}
+    - {id: 'todos:rosa', name: ROSA, hex: '#ff2878', alias: 'qlc:4'}
+    - {id: 'todos:rosa-vermelho', name: ROSA VERMELHO, hex: '#ff0a2d', alias: 'qlc:24'}
+    - {id: 'todos:roxo', name: ROXO, hex: '#ff00ff', temp: fria, alias: 'qlc:3'}
+    - {id: 'todos:roxo-profundo', name: ROXO PROFUNDO, hex: '#5a00c8', temp: fria, alias: 'qlc:31'}
+    - {id: 'todos:verde', name: VERDE, hex: '#00ff00', temp: fria, alias: 'qlc:9'}
+    - {id: 'todos:verde-limao', name: VERDE LIMÃO, hex: '#8cff00', temp: fria, alias: 'qlc:10'}
+    - {id: 'todos:vermelho', name: VERMELHO, hex: '#ff0000', temp: quente, alias: 'qlc:0'}
+    - {id: 'todos:vermelho-profundo', name: VERMELHO PROFUNDO, hex: '#c80000', temp: quente, alias: 'qlc:22'}
+    - {id: 'todos:vermelho-quente', name: VERMELHO QUENTE, hex: '#ff1400', temp: quente, alias: 'qlc:15'}
+    - {id: 'todos:vermelho-quente-escuro', name: VERMELHO QUENTE ESCURO, hex: '#ff0c00@180', temp: quente, alias: 'qlc:21'}
+    - {id: 'todos:vermelho-suave', name: VERMELHO SUAVE, hex: '#ff0000@100', temp: quente, alias: 'qlc:27'}
+    - {id: 'todos:violeta', name: VIOLETA, hex: '#7800ff', temp: fria, alias: 'qlc:14'}
+    - {id: 'todos:ambar', name: ÂMBAR, hex: '#ff2d00', temp: quente, alias: 'qlc:16'}
+    - {id: 'todos:ambar-dourado', name: ÂMBAR DOURADO, hex: '#ff3700', temp: quente, alias: 'qlc:18'}
+    - {id: 'todos:ambar-escuro', name: ÂMBAR ESCURO, hex: '#ff2300@180', temp: quente, alias: 'qlc:19'}
+    - {id: 'todos:ambar-suave', name: ÂMBAR SUAVE, hex: '#ff3200@100', temp: quente, alias: 'qlc:26'}
+strobes:
+    - {id: 'fritacao:branco-maximo', name: FRITAÇÃO | BRANCO MÁXIMO, hex: '#ffffff', speed: 255, alias: 'qlc:94'}
+    - {id: 'fritacao:vermelho', name: FRITAÇÃO | VERMELHO, hex: '#ff0000', speed: 253, alias: 'qlc:95'}
+    - {id: 'fritacao:laranja-queimado', name: FRITAÇÃO | LARANJA QUEIMADO, hex: '#ff1900', speed: 252, alias: 'qlc:96'}
+    - {id: 'fritacao:azul-profundo', name: FRITAÇÃO | AZUL PROFUNDO, hex: '#0000a0', speed: 253, alias: 'qlc:97'}
+    - {id: 'fritacao:azul', name: FRITAÇÃO | AZUL, hex: '#0000ff', speed: 252, alias: 'qlc:98'}
+    - {id: 'fritacao:ciano', name: FRITAÇÃO | CIANO, hex: '#00ffff', speed: 254, alias: 'qlc:99'}
+    - {id: 'fritacao:branco', name: FRITAÇÃO | BRANCO, hex: '#ffffff', speed: 254, alias: 'qlc:100'}
+    - {id: 'strobe:branco-254', name: STROBE | BRANCO 254, hex: '#ffffff', speed: 254, alias: 'qlc:101'}
+    - {id: 'strobe:vermelho-253', name: STROBE | VERMELHO 253, hex: '#ff0000', speed: 253, alias: 'qlc:102'}
+    - {id: 'strobe:laranja-252', name: STROBE | LARANJA 252, hex: '#ff1900', speed: 252, alias: 'qlc:103'}
+    - {id: 'strobe:azul-profundo-253', name: STROBE | AZUL PROFUNDO 253, hex: '#0000a0', speed: 253, alias: 'qlc:104'}
+effects:
+    - id: pista:azul-rosa
+      name: AZUL ROSA
+      alias: qlc:30
+      step_ms: 700
+      agitation: calma
+      temp: fria
+      colors: [AZUL, ROSA, ROXO]
+      mood: {energy: 0.45, joy: 0.65, tension: 0.15, romance: 0.8, label: synthpop romântico sedutor}
+      steps:
+        - '#0000ff #ff2878 #0000ff'
+        - '#ff2878 #0000ff #ff2878'
+        - '#0000ff #ff2878 #0000ff'
+        - '#ff2878 #ff00ff #ff2878'
+        - '#ff00ff #ff2878 #ff00ff'
+        - '#0000ff #ff2878 #0000ff'
+    - id: pista:batidao
+      name: BATIDÃO
+      alias: qlc:51
+      step_ms: 300
+      agitation: agitada
+      temp: mista
+      colors: [AZUL, BRANCO, MAGENTA, ROXO, VERMELHO]
+      mood: {energy: 0.95, joy: 0.55, tension: 0.8, romance: 0.1, label: pista rave explosiva}
+      steps:
+        - '#ff0000 #ff0000 #ff0000 400ms'
+        - '#ff0064@180 #ff0064@180 #ff0064@180 400ms'
+        - '#0000ff #ff00ff #0000ff 350ms'
+        - '#ff00ff #0000ff #ff00ff 350ms'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#000000 #000000 #000000 100ms'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#000000 #000000 #000000 100ms'
+        - '#ff0000 #000000 #000000'
+        - '#000000 #ff0000 #000000'
+        - '#000000 #000000 #ff0000'
+        - '#ff0064 #000000 #000000'
+        - '#000000 #ff0064 #000000'
+        - '#000000 #000000 #ff0064'
+        - '#0000ff #ff0064 #0000ff 450ms'
+        - '#ff00ff #ff0000 #ff00ff 450ms'
+        - '#ffffff #ffffff #ffffff 90ms'
+        - '#000000 #000000 #000000 90ms'
+        - '#ffffff #ffffff #ffffff 90ms'
+        - '#000000 #000000 #000000 90ms'
+    - id: pista:branco-vermelho
+      name: BRANCO VERMELHO
+      alias: qlc:57
+      step_ms: 250
+      agitation: agitada
+      temp: quente
+      colors: [BRANCO, VERMELHO]
+      mood: {energy: 0.9, joy: 0.3, tension: 0.95, romance: 0.05, label: alerta estroboscópico frenético}
+      steps:
+        - '#ff0000 #ffffff #ff0000 400ms'
+        - '#ffffff #ff0000 #ffffff 400ms'
+        - '#c80000 #ffffff #c80000 350ms'
+        - '#ffffff #c80000 #ffffff 350ms'
+        - '#ffffff #000000 #000000'
+        - '#000000 #ffffff #000000'
+        - '#000000 #000000 #ffffff'
+        - '#ff0000 #ff0000 #ff0000 450ms'
+        - '#c80000 #ff0000 #c80000 400ms'
+        - '#ff0000 #c80000 #ff0000 400ms'
+        - '#ffffff #ff0000 #ffffff 300ms'
+        - '#ff0000 #ffffff #ff0000 300ms'
+        - '#000000 #000000 #ffffff'
+        - '#000000 #ffffff #000000'
+        - '#ffffff #000000 #000000'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#000000 #000000 #000000 100ms'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#ff0000 #ff0000 #ff0000 450ms'
+    - id: pista:calor
+      name: CALOR
+      alias: qlc:63
+      step_ms: 600
+      agitation: media
+      temp: quente
+      colors: [BORDÔ, DOURADO, FOGO, LARANJA QUEIMADO, VERMELHO, VERMELHO QUENTE, ÂMBAR, ÂMBAR DOURADO]
+      mood: {energy: 0.5, joy: 0.6, tension: 0.3, romance: 0.7, label: brilho quente envolvente}
+      steps:
+        - '#ff0000 #ff2d00 #ff0000'
+        - '#ff2d00 #ff0000 #ff2d00'
+        - '#c80000 #ff5000 #ff1900 700ms'
+        - '#ff1900 #c80000 #ff5000 700ms'
+        - '#ff5000 #ff1900 #c80000 700ms'
+        - '#ff1e00 #ff1e00 #ff1e00 450ms'
+        - '#ff0014@180 #ff0014@180 #ff0014@180 500ms'
+        - '#ff1400 #ff2d00 #ff1400 550ms'
+        - '#ff2d00 #ff1400 #ff2d00 550ms'
+        - '#ff5000 #ff0000 #ff3700 650ms'
+        - '#ff3700 #ff5000 #ff0000 650ms'
+        - '#ff0000 #ff3700 #ff5000 650ms'
+        - '#c80000 #ff0014@180 #c80000 750ms'
+        - '#ff0014@180 #c80000 #ff0014@180 750ms'
+        - '#ff1e00 #ff1900 #ff2d00 500ms'
+        - '#ff2d00 #ff1900 #ff1e00 500ms'
+        - '#ff1400 #ff5000 #ff1400'
+        - '#ff5000 #ff1400 #ff5000'
+        - '#ff0000 #ff1e00 #c80000 400ms'
+        - '#c80000 #ff1e00 #ff0000 400ms'
+    - id: pista:caos-quente
+      name: CAOS QUENTE
+      alias: qlc:73
+      step_ms: 200
+      agitation: agitada
+      temp: quente
+      colors: [BRANCO, DOURADO, FOGO, LARANJA QUEIMADO, VERMELHO, VERMELHO QUENTE, ÂMBAR]
+      mood: {energy: 0.92, joy: 0.45, tension: 0.85, romance: 0.15, label: incêndio dramático caótico}
+      steps:
+        - '#ff0000 #ff1e00 #ff2d00 300ms'
+        - '#ffffff #ffffff #ffffff 120ms'
+        - '#ff1900 #ff1900 #c80000 450ms'
+        - '#ff2d00 #ff5000 #ff1e00'
+        - '#ff1e00 #ff2d00 #ff5000'
+        - '#c80000@120 #c80000@120 #c80000@120 800ms'
+        - '#ff5000 #ffffff #ff5000 150ms'
+        - '#ff0000 #ff1400 #ff1900 350ms'
+        - '#000000 #ff1e00 #000000 250ms'
+        - '#ff1e00 #000000 #ff1e00 250ms'
+        - '#ff2d00 #ff2d00 #ff2d00 700ms'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#000000 #000000 #000000 100ms'
+        - '#ff1400 #ff2d00 #ff1400 400ms'
+        - '#ff5000@160 #ff2d00@160 #ff1900@160 500ms'
+        - '#ff1900 #ff0000 #ff1e00 180ms'
+        - '#ff0000 #ff1900 #ff2d00 180ms'
+        - '#ff1e00 #000000 #ff1e00 300ms'
+        - '#000000 #ff5000 #000000 300ms'
+        - '#c80000 #c80000 #ff2d00 900ms'
+        - '#ffffff #000000 #ffffff 120ms'
+        - '#000000 #ffffff #000000 120ms'
+        - '#ff1e00 #ff5000 #ff0000 350ms'
+        - '#ff2d00 #ff1400 #ff1900 250ms'
+        - '#ff0000@100 #ff0000@100 #ff0000@100 450ms'
+        - '#ff5000 #ff2d00 #ff5000'
+        - '#ff2d00 #ff5000 #ff2d00'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#c80000 #ff1e00 #c80000 750ms'
+        - '#ff1900 #ff2d00 #ff5000 400ms'
+        - '#ff1400@180 #ff1e00@180 #ff1400@180 550ms'
+        - '#ff0000 #ff5000 #ff1900 300ms'
+    - id: pista:chill
+      name: CHILL
+      alias: qlc:47
+      step_ms: 2500
+      agitation: calma
+      temp: fria
+      colors: [AZUL, CIANO, ROSA, ROXO PROFUNDO, VIOLETA]
+      mood: {energy: 0.05, joy: 0.5, tension: 0.05, romance: 0.75, label: lounge espacial imersivo}
+      steps:
+        - '#0000a0 #7800ff #5a00c8 fade900ms'
+        - '#0000a0 #7800ff #ff2878 fade900ms'
+        - '#00ffff #7800ff #ff2878 fade900ms'
+        - '#00ffff #5a00c8 #ff2878 2800ms fade1000ms'
+        - '#00ffff #5a00c8 #7800ff 2800ms fade1000ms'
+        - '#ff2878 #5a00c8 #7800ff 3000ms fade1000ms'
+        - '#ff2878 #0000a0 #7800ff 3000ms fade1000ms'
+        - '#ff2878 #0000a0 #00ffff fade900ms'
+        - '#7800ff #0000a0 #00ffff fade900ms'
+        - '#7800ff #ff2878 #00ffff 2800ms fade1000ms'
+        - '#7800ff #ff2878 #0000a0 2800ms fade1000ms'
+        - '#0000a0 #ff2878 #0000a0 3000ms fade1200ms'
+    - id: pista:cinema
+      name: CINEMA
+      alias: qlc:69
+      step_ms: 100
+      agitation: calma
+      temp: quente
+      colors: [BORDÔ, BRANCO, DOURADO, VERMELHO, ÂMBAR ESCURO]
+      mood: {energy: 0.35, joy: 0.25, tension: 0.7, romance: 0.45, label: suspense dramático orquestral}
+      steps:
+        - '#ff0014@180 #c80000 #ff0014@180 2200ms fade600ms'
+        - '#c80000 #ff2300@180 #ff0014@180 1800ms fade600ms'
+        - '#ff2300@180 #ff2300@180 #c80000 1200ms fade400ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000'
+        - '#ffffff #ffffff #ffffff'
+        - '#c80000 #ff0014@180 #ff2300@180 2200ms fade600ms'
+        - '#ff0014@180 #ff5000 #ff0014@180 1800ms fade600ms'
+        - '#ff2300@180 #c80000 #ff2300@180 2200ms fade600ms'
+        - '#c80000 #c80000 #ff0014@180 1200ms fade400ms'
+        - '#ff5000 #ff2300@180 #ff5000 1800ms fade600ms'
+        - '#ff0014@180 #ff0014@180 #c80000 2200ms fade600ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000'
+        - '#ffffff #ffffff #ffffff'
+        - '#ff2300@180 #c80000 #ff0014@180 1500ms fade500ms'
+        - '#ff0014@180 #ff2300@180 #ff5000 2200ms fade600ms'
+        - '#c80000 #ff0014@180 #ff2300@180 1800ms fade600ms'
+    - id: pista:club
+      name: CLUB
+      alias: qlc:43
+      step_ms: 350
+      agitation: agitada
+      temp: fria
+      colors: [AZUL, CIANO, MAGENTA, VIOLETA]
+      mood: {energy: 0.92, joy: 0.75, tension: 0.65, romance: 0.25, label: clubber noturno vibrante}
+      steps:
+        - '#0000a0 #7800ff #ff0064'
+        - '#ff0064 #0000a0 #7800ff'
+        - '#7800ff #ff0064 #0000a0'
+        - '#00ffff #ff0064 #00ffff 300ms'
+        - '#ff0064 #00ffff #ff0064 300ms'
+        - '#0000a0 #00ffff #7800ff 400ms'
+        - '#7800ff #0000a0 #00ffff 400ms'
+        - '#ff0064 #7800ff #ff0064 300ms'
+        - '#7800ff #ff0064 #7800ff 300ms'
+        - '#00ffff #0000a0 #ff0064'
+        - '#ff0064 #0000a0 #00ffff'
+        - '#0000a0 #ff0064 #7800ff 450ms'
+        - '#7800ff #00ffff #0000a0 450ms'
+        - '#ff0064@180 #ff0064@180 #ff0064@180 250ms'
+        - '#0000a0 #7800ff #00ffff 400ms'
+        - '#00ffff #7800ff #0000a0 400ms'
+    - id: pista:color-flow
+      name: COLOR FLOW
+      alias: qlc:53
+      step_ms: 1000
+      agitation: calma
+      temp: fria
+      colors: [AZUL, CIANO, ROSA, ROXO, VERDE, ÂMBAR]
+      mood: {energy: 0.3, joy: 0.85, tension: 0.1, romance: 0.4, label: fluidez psicodélica suave}
+      steps:
+        - '#0000ff #00ffff #ff00ff'
+        - '#ff00ff #0000ff #00ffff'
+        - '#00ffff #ff00ff #0000ff'
+        - '#ff2878 #00ffff #ff00ff 1100ms'
+        - '#ff00ff #ff2878 #00ffff 1100ms'
+        - '#00ffff #ff00ff #ff2878 1100ms'
+        - '#00ff00 #ff2878 #ff00ff 1200ms'
+        - '#ff00ff #00ff00 #ff2878 1200ms'
+        - '#ff2878 #ff00ff #00ff00 1200ms'
+        - '#ff2d00 #ff2878 #00ff00 1300ms'
+        - '#00ff00 #ff2d00 #ff2878 1300ms'
+        - '#ff2878 #00ff00 #ff2d00 1300ms'
+        - '#0000ff #00ff00 #ff2d00 1500ms'
+        - '#ff2d00 #0000ff #00ff00 1500ms'
+        - '#00ff00 #ff2d00 #0000ff 1500ms'
+    - id: pista:contramao
+      name: CONTRAMÃO
+      alias: qlc:65
+      step_ms: 250
+      agitation: agitada
+      temp: quente
+      colors: [DOURADO, VERMELHO, VERMELHO QUENTE, ÂMBAR]
+      mood: {energy: 0.88, joy: 0.35, tension: 0.82, romance: 0.1, label: corrida urgente pulsante}
+      steps:
+        - '#ff2d00 #ff2d00@60 #ff2d00@25'
+        - '#ff2d00@140 #ff2d00 #ff2d00@60'
+        - '#ff2d00@60 #ff2d00@140 #ff2d00'
+        - '#ff2d00@25 #ff2d00@60 #ff2d00'
+        - '#ff5000@25 #ff5000@60 #ff5000'
+        - '#ff5000@60 #ff5000 #ff5000@140'
+        - '#ff5000 #ff5000@140 #ff5000@60'
+        - '#ff5000 #ff5000@60 #ff5000@25'
+        - '#c80000 #c80000@60 #c80000@25 200ms'
+        - '#c80000@140 #c80000 #c80000@60 200ms'
+        - '#c80000@60 #c80000@140 #c80000 200ms'
+        - '#ff1400@60 #ff1400@140 #ff1400 200ms'
+        - '#ff1400@140 #ff1400 #ff1400@140 200ms'
+        - '#ff1400 #ff1400@140 #ff1400@60 200ms'
+        - '#ff5000 #c80000@90 #c80000@40 300ms'
+        - '#c80000@90 #ff5000 #c80000@90 300ms'
+        - '#c80000@40 #c80000@90 #ff5000 300ms'
+        - '#c80000@40 #c80000@90 #ff2d00 300ms'
+        - '#c80000@90 #ff2d00 #c80000@90 300ms'
+        - '#ff2d00 #c80000@90 #c80000@40 300ms'
+        - '#ff1400 #ff1400 #ff1400 600ms'
+        - '#ff1400@140 #ff1400@140 #ff1400@140 350ms'
+    - id: pista:dourado-vermelho
+      name: DOURADO VERMELHO
+      alias: qlc:71
+      step_ms: 400
+      agitation: media
+      temp: quente
+      colors: [DOURADO, VERMELHO, ÂMBAR DOURADO]
+      mood: {energy: 0.65, joy: 0.5, tension: 0.55, romance: 0.5, label: paixão teatral vibrante}
+      steps:
+        - '#ff5000 #ff0000 #ff5000 450ms'
+        - '#ff0000 #ff5000 #ff0000 450ms'
+        - '#ff5000 #c80000 #ff3700 500ms'
+        - '#ff0000 #ff5000 #ff3700 500ms'
+        - '#ff3700 #ff0000 #ff5000 500ms'
+        - '#ff0000 #ff0000 #ff0000'
+        - '#ff5000 #ff5000 #ff5000'
+        - '#ff5000 #ff3700 #ff5000 350ms'
+        - '#ff3700 #ff5000 #ff3700 350ms'
+        - '#c80000 #ff5000 #c80000 450ms'
+        - '#ff5000 #c80000 #ff5000 450ms'
+        - '#ff0000 #ff3700 #c80000 550ms'
+        - '#c80000 #ff3700 #ff0000 550ms'
+        - '#ff5000 #ff0000 #ff3700 300ms'
+        - '#ff3700 #ff0000 #ff5000 300ms'
+        - '#ff0000 #c80000 #ff0000'
+        - '#ff5000 #ff3700 #ff5000'
+        - '#ff0000 #ff0000 #ff0000 350ms'
+    - id: pista:festa
+      name: FESTA
+      alias: qlc:49
+      step_ms: 700
+      agitation: calma
+      temp: mista
+      colors: [AMARELO, AZUL, BRANCO, CIANO, LARANJA, MAGENTA, ROSA, ROXO, VERDE, VERDE LIMÃO, VERMELHO]
+      mood: {energy: 0.75, joy: 1, tension: 0.05, romance: 0.3, label: celebração pop festiva}
+      steps:
+        - '#ff0000 #ff2878 #ff00ff 600ms'
+        - '#ff00ff #ff0000 #ff2878 600ms'
+        - '#ff2878 #ff00ff #ff0000 600ms'
+        - '#0000ff #00ffff #0000ff 550ms'
+        - '#00ffff #0000ff #00ffff 550ms'
+        - '#00ff00 #8cff00 #00ff00 500ms'
+        - '#8cff00 #00ff00 #8cff00 500ms'
+        - '#ffffff #ffffff #ffffff 130ms'
+        - '#ff6400 #ff3c00 #ff6400'
+        - '#ff3c00 #ff6400 #ff3c00'
+        - '#ff0064@180 #ff2878@180 #ff0064@180 650ms'
+        - '#ff0064 #ff2878 #ff0064 650ms'
+        - '#0000ff #00ff00 #ff2878 800ms'
+        - '#ff2878 #0000ff #00ff00 800ms'
+        - '#00ff00 #ff2878 #0000ff 800ms'
+        - '#00ffff #ff0064 #ff6400 750ms'
+        - '#ff6400 #00ffff #ff0064 750ms'
+        - '#ff0000 #ff0000 #ff0000 450ms'
+        - '#ff0000@100 #ff0000@100 #ff0000@100 450ms'
+        - '#ffffff #ffffff #ffffff 120ms'
+        - '#ff00ff #8cff00 #ff00ff 900ms'
+        - '#8cff00 #ff00ff #8cff00 900ms'
+        - '#ff3c00 #ff2878 #00ffff'
+        - '#00ffff #ff2878 #ff3c00'
+    - id: pista:flash
+      name: FLASH
+      alias: qlc:55
+      step_ms: 100
+      agitation: agitada
+      temp: neutra
+      colors: [BRANCO]
+      steps:
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000 500ms'
+        - '#ffffff #000000 #000000'
+        - '#000000 #ffffff #000000'
+        - '#000000 #000000 #ffffff'
+        - '#000000 #000000 #000000 400ms'
+        - '#ffffff #000000 #ffffff 120ms'
+        - '#000000 #ffffff #000000 120ms'
+        - '#ffffff #000000 #ffffff 120ms'
+        - '#000000 #ffffff #000000 120ms'
+        - '#000000 #000000 #000000 600ms'
+        - '#ffffff #ffffff #ffffff 80ms'
+        - '#000000 #000000 #000000 80ms'
+        - '#ffffff #ffffff #ffffff 80ms'
+        - '#000000 #000000 #000000 700ms'
+        - '#000000 #000000 #ffffff'
+        - '#000000 #ffffff #000000'
+        - '#ffffff #000000 #000000'
+        - '#000000 #000000 #000000 500ms'
+    - id: pista:fogo
+      name: FOGO
+      alias: qlc:61
+      step_ms: 180
+      agitation: agitada
+      temp: quente
+      colors: [FOGO, LARANJA QUEIMADO, VERMELHO, ÂMBAR]
+      mood: {energy: 0.98, joy: 0.3, tension: 0.9, romance: 0.2, label: labareda visceral intensa}
+      steps:
+        - '#ff0000 #ff1e00 #ff2d00 250ms'
+        - '#ff1e00 #ff1900 #ff0000 250ms'
+        - '#ff2d00 #ff0000 #ff1e00 220ms'
+        - '#ff1900 #ff1e00 #ff1900 220ms'
+        - '#ff0000@180 #ff1e00 #ff2d00@180 200ms'
+        - '#ff1e00 #ff1900@130 #ff0000 200ms'
+        - '#ff2d00 #ff1e00 #ff0000 150ms'
+        - '#ff1e00 #ff2d00 #ff1900 150ms'
+        - '#ff0000 #ff1900 #ff1e00 280ms'
+        - '#ff1900 #ff0000 #ff2d00 280ms'
+        - '#ff1e00@180 #ff0000@180 #ff1e00@180 250ms'
+        - '#ff1e00 #ff2d00@130 #ff1e00'
+        - '#ff2d00 #ff1900 #ff0000'
+        - '#ff0000 #ff2d00 #ff1e00 120ms'
+        - '#ff1e00 #ff0000 #ff1900 120ms'
+        - '#ff1900 #ff2d00 #ff1e00 300ms'
+        - '#ff2d00 #ff1e00 #ff0000 300ms'
+        - '#ff0000@130 #ff1e00@130 #ff1900@130 200ms'
+        - '#ff1e00 #ff1900 #ff2d00 200ms'
+        - '#ff0000 #ff1e00 #ff0000'
+        - '#ff1e00 #ff0000 #ff1e00'
+        - '#ff2d00 #ff1900 #ff2d00 250ms'
+    - id: pista:fogo-cruzado
+      name: FOGO CRUZADO
+      alias: qlc:89
+      step_ms: 400
+      agitation: media
+      temp: quente
+      colors: [DOURADO, DOURADO SUAVE, FOGO, LARANJA QUEIMADO, VERMELHO QUENTE, ÂMBAR]
+      mood: {energy: 0.7, joy: 0.4, tension: 0.75, romance: 0.25, label: duelo rítmico caloroso}
+      steps:
+        - '#ff1400 #ff5000@80 #ff1400'
+        - '#ff1400@150 #ff5000@200 #ff1400@150 350ms'
+        - '#ff1400@70 #ff5000 #ff1400@70'
+        - '#ff5000 #ff1400@70 #ff5000'
+        - '#ff2d00 #ff1e00@80 #ff2d00'
+        - '#ff2d00@150 #ff1e00@200 #ff2d00@150 350ms'
+        - '#ff2d00@70 #ff1e00 #ff2d00@70'
+        - '#ff1e00 #ff2d00@70 #ff1e00'
+        - '#ff1e00 #ff1400@80 #ff1e00 450ms'
+        - '#ff1e00@150 #ff1400@200 #ff1e00@150'
+        - '#ff1e00@70 #ff1400 #ff1e00@70 450ms'
+        - '#ff1900 #ff5000@100 #ff1900 500ms'
+        - '#ff1900@100 #ff5000 #ff1900@100 500ms'
+        - '#ff2d00 #ff1e00 #ff2d00 250ms'
+        - '#ff1e00 #ff2d00 #ff1e00 200ms'
+        - '#ff1400 #ff1900 #ff1400 150ms'
+        - '#ff1900 #ff1400 #ff1900 120ms'
+        - '#ff5000 #ff5000 #ff5000 600ms'
+        - '#ff1400 #ff2d00@90 #ff1400 450ms'
+        - '#ff1400@90 #ff2d00 #ff1400@90 450ms'
+        - '#ff5000 #ff1e00@90 #ff5000'
+        - '#ff5000@90 #ff1e00 #ff5000@90'
+        - '#ff1900 #ff2d00@120 #ff1900 350ms'
+        - '#ff1900@120 #ff2d00 #ff1900@120 350ms'
+    - id: pista:golden
+      name: GOLDEN
+      alias: qlc:59
+      step_ms: 1000
+      agitation: calma
+      temp: quente
+      colors: [DOURADO, LARANJA QUEIMADO, ÂMBAR, ÂMBAR DOURADO]
+      mood: {energy: 0.38, joy: 0.65, tension: 0.15, romance: 0.65, label: crepúsculo dourado sofisticado}
+      steps:
+        - '#ff5000 #ff2d00 #ff5000 800ms'
+        - '#ff2d00 #ff5000 #ff2d00 800ms'
+        - '#ff1900 #ff3700 #ff5000 900ms'
+        - '#ff5000 #ff1900 #ff3700 900ms'
+        - '#ff3700 #ff5000 #ff1900 900ms'
+        - '#ff5000@200 #ff2d00@200 #ff5000@200 700ms'
+        - '#ff5000 #ff2d00 #ff5000 700ms'
+        - '#ff2d00 #ff3700 #ff2d00'
+        - '#ff3700 #ff2d00 #ff3700'
+        - '#ff1900@180 #ff1900@180 #ff1900@180 800ms'
+        - '#ff1900 #ff2d00 #ff5000 950ms'
+        - '#ff5000 #ff2d00 #ff1900 950ms'
+        - '#ff2d00@210 #ff5000 #ff2d00@210 600ms'
+        - '#ff5000 #ff2d00@210 #ff5000 600ms'
+        - '#ff3700 #ff1900 #ff3700'
+        - '#ff1900 #ff3700 #ff1900'
+    - id: pista:impacto
+      name: IMPACTO
+      alias: qlc:83
+      step_ms: 100
+      agitation: agitada
+      temp: quente
+      colors: [BRANCO, DOURADO, VERMELHO]
+      mood: {energy: 0.86, joy: 0.3, tension: 0.9, romance: 0.05, label: clímax cortante agressivo}
+      steps:
+        - '#ff0000 #ff5000 #ff0000 400ms'
+        - '#ff5000 #ff0000 #ff5000 400ms'
+        - '#ff0000 #ff5000 #ff0000 350ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000'
+        - '#ffffff #ffffff #ffffff'
+        - '#c80000 #ff5000 #c80000 500ms'
+        - '#ff5000 #c80000 #ff5000 400ms'
+        - '#ff0000 #ff0000 #ff5000 350ms'
+        - '#ff5000 #ff0000 #ff0000 350ms'
+        - '#ffffff #000000 #000000'
+        - '#000000 #ffffff #000000'
+        - '#000000 #000000 #ffffff'
+        - '#ff0000 #ff0000 #ff0000 450ms'
+        - '#c80000 #ff0000 #c80000 400ms'
+        - '#ff5000 #ff5000 #ff0000 300ms'
+        - '#ff0000 #ff5000 #ff5000 300ms'
+        - '#ffffff #ffffff #ffffff 90ms'
+        - '#000000 #000000 #000000 90ms'
+        - '#c80000 #c80000 #c80000 500ms'
+        - '#ff5000 #ff0000 #ff5000 350ms'
+        - '#ff0000 #ff5000 #ff0000 350ms'
+        - '#000000 #ffffff #000000 110ms'
+        - '#ffffff #000000 #ffffff 110ms'
+        - '#c80000 #ff5000 #c80000 500ms'
+    - id: pista:meninos-e-meninas-1
+      name: MENINOS E MENINAS 1
+      alias: qlc:79
+      step_ms: 400
+      agitation: media
+      temp: fria
+      colors: [AZUL, ROSA VERMELHO, ROXO PROFUNDO]
+      mood: {energy: 0.7, joy: 0.6, tension: 0.4, romance: 0.55, label: tensão pop dual}
+      steps:
+        - '#0000a0 #0000a0 #0000a0'
+        - '#ff0a2d #ff0a2d #ff0a2d'
+        - '#0000a0 #0000a0 #0000a0'
+        - '#ff0a2d #ff0a2d #ff0a2d'
+        - '#5a00c8 #5a00c8 #5a00c8'
+        - '#ff0a2d #ff0a2d #ff0a2d'
+    - id: pista:meninos-e-meninas-2
+      name: MENINOS E MENINAS 2
+      alias: qlc:33
+      step_ms: 400
+      agitation: media
+      temp: fria
+      colors: [AZUL, ROSA VERMELHO, ROXO PROFUNDO]
+      mood: {energy: 0.72, joy: 0.68, tension: 0.35, romance: 0.6, label: jogo amoroso dançante}
+      steps:
+        - '#0000a0 #ff0a2d #0000a0'
+        - '#ff0a2d #0000a0 #ff0a2d'
+        - '#0000a0 #5a00c8 #ff0a2d'
+        - '#ff0a2d #0000a0 #5a00c8'
+        - '#5a00c8 #ff0a2d #0000a0'
+        - '#0000a0 #ff0a2d #5a00c8'
+        - '#5a00c8 #0000a0 #ff0a2d'
+        - '#ff0a2d #5a00c8 #0000a0'
+    - id: pista:meninos-e-meninas-3
+      name: MENINOS E MENINAS 3
+      alias: qlc:81
+      step_ms: 400
+      agitation: media
+      temp: fria
+      colors: [AZUL, ROSA VERMELHO, ROXO PROFUNDO]
+      mood: {energy: 0.74, joy: 0.65, tension: 0.38, romance: 0.6, label: flerte dinâmico alternado}
+      steps:
+        - '#0000a0 #ff0a2d #0000a0'
+        - '#ff0a2d #0000a0 #ff0a2d'
+        - '#0000a0 #0000a0 #ff0a2d'
+        - '#ff0a2d #ff0a2d #0000a0'
+        - '#ff0a2d #0000a0 #0000a0'
+        - '#0000a0 #ff0a2d #ff0a2d'
+        - '#5a00c8 #ff0a2d #5a00c8'
+        - '#0000a0 #5a00c8 #0000a0'
+        - '#5a00c8 #5a00c8 #ff0a2d 450ms'
+        - '#ff0a2d #5a00c8 #5a00c8 450ms'
+        - '#0000a0 #ff0a2d #0000a0'
+        - '#ff0a2d #0000a0 #ff0a2d'
+    - id: pista:perseguicao
+      name: PERSEGUIÇÃO
+      alias: qlc:85
+      step_ms: 180
+      agitation: agitada
+      temp: quente
+      colors: [BRANCO, DOURADO, VERMELHO, ÂMBAR]
+      mood: {energy: 0.99, joy: 0.2, tension: 1, romance: 0, label: fuga alucinante estroboscópica}
+      steps:
+        - '#ff2d00 #ff2d00@120 #ff2d00@50 220ms'
+        - '#ff2d00@120 #ff2d00 #ff2d00@120 220ms'
+        - '#ff2d00@50 #ff2d00@120 #ff2d00 220ms'
+        - '#ff2d00 #ff2d00@120 #ff2d00@50 200ms'
+        - '#ff2d00@120 #ff2d00 #ff2d00@120 200ms'
+        - '#ff2d00@50 #ff2d00@120 #ff2d00 200ms'
+        - '#ff5000@50 #ff5000@120 #ff5000 200ms'
+        - '#ff5000@120 #ff5000 #ff5000@120 200ms'
+        - '#ff5000 #ff5000@120 #ff5000@50 200ms'
+        - '#ff0000 #ff0000@120 #ff0000@50'
+        - '#ff0000@120 #ff0000 #ff0000@120'
+        - '#ff0000@50 #ff0000@120 #ff0000'
+        - '#ff0000@120 #ff0000 #ff0000@120'
+        - '#ff0000 #ff0000@120 #ff0000@50'
+        - '#ff0000 #ff0000 #ff0000 500ms'
+        - '#ffffff #ffffff #ffffff 100ms'
+        - '#ff5000 #ff2d00@120 #ff2d00@50 260ms'
+        - '#ff2d00@120 #ff5000 #ff2d00@120 260ms'
+        - '#ff2d00@50 #ff2d00@120 #ff5000 260ms'
+        - '#ff2d00@120 #ff5000 #ff2d00@120 230ms'
+        - '#ff5000 #ff2d00@120 #ff2d00@50 230ms'
+        - '#ff2d00 #ff2d00@120 #ff2d00@40'
+        - '#ff2d00@120 #ff2d00 #ff2d00@120'
+        - '#ff2d00@40 #ff2d00@120 #ff2d00'
+        - '#ff2d00@120 #ff2d00 #ff2d00@120'
+        - '#ff2d00 #ff2d00@120 #ff2d00@40'
+        - '#ff5000 #ff5000 #ff5000 280ms'
+    - id: pista:pop
+      name: POP
+      alias: qlc:41
+      step_ms: 600
+      agitation: media
+      temp: fria
+      colors: [AZUL, BRANCO, CIANO, MAGENTA, ROSA, ROXO]
+      mood: {energy: 0.78, joy: 0.9, tension: 0.2, romance: 0.45, label: euforia teen brilhante}
+      steps:
+        - '#ff2878 #ff00ff #0000ff'
+        - '#0000ff #ff2878 #ff00ff'
+        - '#ff00ff #0000ff #ff2878'
+        - '#ff0064 #00ffff #ff0064 700ms'
+        - '#00ffff #ff0064 #00ffff 700ms'
+        - '#ff2878@180 #ff2878@180 #ff2878@180 500ms'
+        - '#ff2878 #ff2878 #ff2878 500ms'
+        - '#ffffff #ffffff #ffffff 120ms'
+        - '#ff0064 #ff00ff #ff0064 650ms'
+        - '#00ffff #0000ff #00ffff 650ms'
+        - '#ff2878 #ff0064 #ff00ff 800ms'
+        - '#ff00ff #ff0064 #ff2878 800ms'
+        - '#0000ff@100 #00ffff@100 #0000ff@100 550ms'
+        - '#0000ff #00ffff #0000ff 550ms'
+        - '#ff0064 #ff2878 #00ffff 750ms'
+        - '#ff00ff #ff2878 #0000ff 750ms'
+    - id: pista:pulso-quente
+      name: PULSO QUENTE
+      alias: qlc:67
+      step_ms: 300
+      agitation: media
+      temp: quente
+      colors: [DOURADO, DOURADO SUAVE, VERMELHO, ÂMBAR]
+      mood: {energy: 0.82, joy: 0.45, tension: 0.65, romance: 0.3, label: coração acelerado pulsante}
+      steps:
+        - '#c80000@100 #c80000@100 #c80000@100'
+        - '#c80000@150 #c80000@150 #c80000@150'
+        - '#c80000@215 #c80000@215 #c80000@215'
+        - '#c80000 #c80000 #c80000 350ms'
+        - '#c80000@165 #c80000@165 #c80000@165'
+        - '#c80000@100 #c80000@100 #c80000@100 400ms'
+        - '#ff2d00 #ff2d00@100 #ff2d00'
+        - '#ff2d00@180 #ff2d00@180 #ff2d00@180'
+        - '#ff2d00@100 #ff2d00 #ff2d00@100'
+        - '#ff2d00@180 #ff2d00@180 #ff2d00@180'
+        - '#ff2d00 #ff2d00@100 #ff2d00 350ms'
+        - '#ff5000@100 #ff5000@100 #ff5000@100 500ms'
+        - '#ff5000@160 #ff5000@160 #ff5000@160 450ms'
+        - '#ff5000@220 #ff5000@220 #ff5000@220 400ms'
+        - '#ff5000 #ff5000 #ff5000 500ms'
+        - '#ff5000@160 #ff5000@160 #ff5000@160 450ms'
+        - '#ff5000 #c80000@100 #ff5000'
+        - '#ff5000@150 #c80000@200 #ff5000@150'
+        - '#ff5000@100 #c80000 #ff5000@100'
+        - '#ff5000@180 #c80000@180 #ff5000@180 400ms'
+    - id: pista:pulso-quente-2
+      name: PULSO QUENTE 2
+      alias: qlc:93
+      step_ms: 280
+      agitation: media
+      temp: quente
+      colors: [DOURADO, DOURADO SUAVE, FOGO, VERMELHO, ÂMBAR]
+      mood: {energy: 0.85, joy: 0.4, tension: 0.7, romance: 0.3, label: adrenalina febril rápida}
+      steps:
+        - '#c80000 #c80000@100 #c80000@50 300ms'
+        - '#c80000@150 #c80000 #c80000@100 300ms'
+        - '#c80000@75 #c80000@150 #c80000 300ms'
+        - '#ff2d00@75 #ff2d00@150 #ff2d00 300ms'
+        - '#ff2d00@150 #ff2d00 #ff2d00@100 300ms'
+        - '#ff2d00 #ff2d00@150 #ff2d00@75 300ms'
+        - '#ff1e00 #ff1e00 #ff1e00 450ms'
+        - '#ff5000 #ff5000@100 #ff5000@50'
+        - '#ff5000@150 #ff5000 #ff5000@100'
+        - '#ff5000@75 #ff5000@150 #ff5000'
+        - '#ff2d00@75 #ff5000@150 #ff2d00'
+        - '#ff2d00@150 #ff5000 #ff2d00@150'
+        - '#ff2d00 #ff5000@150 #ff2d00@75'
+        - '#ff1e00 #ff1e00 #ff1e00 450ms'
+        - '#c80000 #ff2d00@100 #ff5000@50 250ms'
+        - '#ff5000@150 #c80000 #ff2d00@100 250ms'
+        - '#ff2d00@75 #ff5000@150 #c80000 250ms'
+        - '#ff2d00@75 #ff5000 #c80000@150 250ms'
+        - '#ff5000 #ff2d00@150 #c80000@75 250ms'
+        - '#ff1e00 #ff1e00@150 #ff1e00@75 400ms'
+        - '#ff1e00@75 #ff1e00@150 #ff1e00 400ms'
+        - '#ff1e00 #ff1e00 #ff1e00 450ms'
+    - id: pista:quente
+      name: QUENTE
+      alias: qlc:45
+      step_ms: 550
+      agitation: calma
+      temp: quente
+      colors: [DOURADO, FOGO, LARANJA QUEIMADO, VERMELHO, VERMELHO QUENTE, ÂMBAR, ÂMBAR DOURADO]
+      mood: {energy: 0.52, joy: 0.55, tension: 0.35, romance: 0.6, label: calor latino cadenciado}
+      steps:
+        - '#ff0000 #ff2d00 #ff0000 700ms'
+        - '#ff2d00 #ff0000 #ff2d00 700ms'
+        - '#ff5000 #ff1e00 #ff1900 800ms'
+        - '#ff1900 #ff3700 #ff5000 800ms'
+        - '#ff5000 #c80000 #c80000'
+        - '#c80000 #ff5000 #c80000'
+        - '#c80000 #c80000 #ff5000'
+        - '#c80000 #c80000 #ff3700'
+        - '#c80000 #ff3700 #c80000'
+        - '#ff3700 #c80000 #c80000'
+        - '#ff1400 #ff1e00 #ff1400 750ms'
+        - '#ff1e00 #ff1400 #ff1e00 750ms'
+        - '#ff2d00 #ff5000 #ff1900 850ms'
+        - '#ff1900 #ff5000 #ff2d00 850ms'
+        - '#ff0000 #ff1400 #c80000 700ms'
+        - '#c80000 #ff1400 #ff0000 700ms'
+    - id: pista:red-200
+      name: RED 200
+      alias: qlc:77
+      step_ms: 200
+      agitation: agitada
+      temp: quente
+      colors: [BORDÔ, VERMELHO, VERMELHO QUENTE]
+      mood: {energy: 0.94, joy: 0.1, tension: 0.95, romance: 0.2, label: pesadelo rubro caótico}
+      steps:
+        - '#ff0000 #ff1400 #ff0000 250ms'
+        - '#ff1400 #ff0000 #ff1400 250ms'
+        - '#c80000 #ff0014@180 #c80000 300ms'
+        - '#ff0014@180 #c80000 #ff0014@180 300ms'
+        - '#ff0000 #c80000 #ff1400'
+        - '#ff1400 #ff0000 #c80000'
+        - '#c80000 #ff1400 #ff0000'
+        - '#ff0000@180 #ff0000@180 #ff0000@180 250ms'
+        - '#ff0000 #ff0000 #ff0000 250ms'
+        - '#ff0014@180 #ff0000 #ff0014@180 300ms'
+        - '#ff0000 #ff0014@180 #ff0000 300ms'
+        - '#ff1400 #c80000 #ff1400'
+        - '#c80000 #ff1400 #c80000'
+        - '#ff0000 #000000 #000000 150ms'
+        - '#000000 #ff0000 #000000 150ms'
+        - '#000000 #000000 #ff0000 150ms'
+        - '#000000 #ff0000 #000000 150ms'
+        - '#ff0000 #000000 #000000 150ms'
+        - '#ff0000 #ff0000 #ff0000 300ms'
+        - '#ff1400 #ff0014@180 #ff1400 250ms'
+        - '#ff0014@180 #ff1400 #ff0014@180 250ms'
+        - '#c80000@140 #c80000 #c80000@140'
+        - '#c80000 #c80000@140 #c80000'
+        - '#ff0000 #ff1400 #c80000 300ms'
+    - id: pista:surto-quente
+      name: SURTO QUENTE
+      alias: qlc:91
+      step_ms: 100
+      agitation: media
+      temp: quente
+      colors: [BRANCO, DOURADO, DOURADO SUAVE, FOGO, VERMELHO, VERMELHO QUENTE, ÂMBAR]
+      mood: {energy: 0.68, joy: 0.45, tension: 0.75, romance: 0.2, label: crise dramática instável}
+      steps:
+        - '#c80000 #ff2d00@200 #c80000 550ms'
+        - '#ff2d00@200 #c80000 #ff2d00@200 500ms'
+        - '#ff1400 #ff5000 #ff1400 650ms'
+        - '#ff5000 #ff1400 #ff5000 600ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#ff1e00 #ff1e00 #ff1e00 120ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#c80000 #c80000 #c80000 800ms'
+        - '#ff2d00 #ff5000 #ff2d00 450ms'
+        - '#ff5000 #ff2d00 #ff5000 500ms'
+        - '#ff1e00 #ff1400 #ff1e00 600ms'
+        - '#ff1400 #ff1e00 #ff1400 450ms'
+        - '#ff5000@180 #ff2d00@180 #ff5000@180 650ms'
+        - '#ff1e00 #ff1e00 #ff1e00 150ms'
+        - '#ffffff #ffffff #ffffff 90ms'
+        - '#ff1e00 #ff1e00 #ff1e00 150ms'
+        - '#ffffff #ffffff #ffffff 90ms'
+        - '#ff2d00 #c80000 #ff2d00 900ms'
+        - '#ff5000 #c80000 #ff5000 500ms'
+        - '#c80000 #ff5000 #c80000 550ms'
+        - '#ff2d00 #ff1e00 #ff2d00 400ms'
+        - '#ff1400 #000000 #ff1400 180ms'
+        - '#000000 #ff1e00 #000000 160ms'
+        - '#ff1e00 #000000 #ff1e00 160ms'
+        - '#ffffff #ffffff #ffffff'
+        - '#000000 #000000 #000000 80ms'
+        - '#ff5000 #ff5000 #ff5000 850ms'
+        - '#c80000@200 #ff2d00 #c80000@200 600ms'
+        - '#ff1400 #ff5000 #ff1400 550ms'
+        - '#ff1e00@180 #ff1e00@180 #ff1e00@180 700ms'
+    - id: pista:tricolor
+      name: TRICOLOR
+      alias: qlc:35
+      step_ms: 650
+      agitation: calma
+      temp: fria
+      colors: [AZUL, ROSA, ROXO]
+      mood: {energy: 0.58, joy: 0.78, tension: 0.2, romance: 0.55, label: balada pop chic}
+      steps:
+        - '#0000ff #ff00ff #ff2878'
+        - '#ff2878 #0000ff #ff00ff'
+        - '#ff00ff #ff2878 #0000ff'
+        - '#ff00ff #0000ff #ff2878'
+        - '#ff2878 #ff00ff #0000ff'
+        - '#0000ff #ff2878 #ff00ff'
+    - id: pista:verde-azul-rosa
+      name: VERDE AZUL ROSA
+      alias: qlc:39
+      step_ms: 550
+      agitation: media
+      temp: fria
+      colors: [AZUL, ROSA, VERDE]
+      mood: {energy: 0.62, joy: 0.88, tension: 0.1, romance: 0.35, label: carnaval elétrico descontraído}
+      steps:
+        - '#00ff00 #0000ff #ff2878 600ms'
+        - '#ff2878 #00ff00 #0000ff 600ms'
+        - '#0000ff #ff2878 #00ff00 600ms'
+        - '#00ff00 #ff2878 #0000ff 650ms'
+        - '#0000ff #00ff00 #ff2878 650ms'
+        - '#ff2878 #0000ff #00ff00 650ms'
+        - '#00ff00 #ff2878 #00ff00'
+        - '#0000ff #ff2878 #0000ff'
+        - '#ff2878 #0000ff #ff2878'
+        - '#00ff00 #0000ff #ff2878 700ms'
+        - '#0000ff #ff2878 #00ff00 700ms'
+        - '#ff2878 #00ff00 #0000ff 750ms'
+    - id: pista:verde-rosa
+      name: VERDE ROSA
+      alias: qlc:37
+      step_ms: 650
+      agitation: calma
+      temp: fria
+      colors: [ROSA, ROXO, VERDE]
+      mood: {energy: 0.52, joy: 0.8, tension: 0.15, romance: 0.5, label: doçura lúdica moderna}
+      steps:
+        - '#00ff00 #ff2878 #00ff00 700ms'
+        - '#ff2878 #00ff00 #ff2878 700ms'
+        - '#00ff00 #ff00ff #ff2878 850ms'
+        - '#ff2878 #ff00ff #00ff00 850ms'
+        - '#00ff00 #ff2878 #ff2878'
+        - '#ff2878 #00ff00 #00ff00'
+        - '#ff00ff #ff2878 #00ff00 1000ms'
+        - '#00ff00 #ff2878 #ff00ff 1000ms'
+        - '#ff2878 #ff2878 #ff00ff 700ms'
+        - '#ff00ff #00ff00 #ff2878 800ms'
+        - '#00ff00 #00ff00 #ff2878'
+        - '#ff2878 #ff00ff #ff00ff 950ms'
+    - id: pista:vermelho-branco-2
+      name: VERMELHO BRANCO 2
+      alias: qlc:87
+      step_ms: 400
+      agitation: media
+      temp: quente
+      colors: [BRANCO, VERMELHO]
+      mood: {energy: 0.88, joy: 0.25, tension: 0.92, romance: 0.05, label: urgência cênica cortante}
+      steps:
+        - '#ff0000 #ffffff #ff0000'
+        - '#ffffff #ff0000 #ffffff'
+        - '#ff0000 #ffffff #ff0000 350ms'
+        - '#ffffff #ff0000 #ffffff 350ms'
+        - '#ff0000 #ff0000 #ffffff 300ms'
+        - '#ffffff #ff0000 #ff0000 300ms'
+        - '#ff0000 #ffffff #ff0000 300ms'
+        - '#ff0000 #ff0000 #ff0000'
+        - '#ffffff #ffffff #ffffff 350ms'
+        - '#ff0000 #ff0000 #ff0000'
+        - '#ffffff #ff0000 #ffffff 120ms'
+        - '#ff0000 #ffffff #ff0000 120ms'
+        - '#ffffff #ff0000 #ffffff 120ms'
+        - '#c80000 #c80000 #c80000'
+        - '#c80000 #ffffff #c80000 350ms'
+        - '#ffffff #c80000 #ffffff 350ms'
+        - '#ff0000 #ffffff #ffffff 300ms'
+        - '#ffffff #ffffff #ff0000 300ms'
+        - '#ffffff #ffffff #ffffff 150ms'
+        - '#ff0000 #ff0000 #ff0000 150ms'
+        - '#ffffff #ffffff #ffffff 150ms'
+        - '#ff0000 #ffffff #ff0000'
+    - id: pista:ambar-200
+      name: ÂMBAR 200
+      alias: qlc:75
+      step_ms: 200
+      agitation: agitada
+      temp: quente
+      colors: [DOURADO, LARANJA QUEIMADO, ÂMBAR, ÂMBAR DOURADO]
+      mood: {energy: 0.96, joy: 0.5, tension: 0.7, romance: 0.15, label: frenesi solar faiscante}
+      steps:
+        - '#ff2d00 #ff3700 #ff5000'
+        - '#ff5000 #ff2d00 #ff3700'
+        - '#ff3700 #ff5000 #ff2d00'
+        - '#ff1900 #ff3700 #ff5000'
+        - '#ff5000 #ff1900 #ff3700'
+        - '#ff3700 #ff5000 #ff1900'
+        - '#ff2d00 #ff5000 #ff3700'
+        - '#ff3700 #ff2d00 #ff5000'
+        - '#ff5000 #ff3700 #ff2d00'
+        - '#ff1900 #ff5000 #ff2d00'
+        - '#ff2d00 #ff1900 #ff5000'
+        - '#ff5000 #ff2d00 #ff1900'
+        - '#ff2d00 #ff5000 #ff2d00'
+        - '#ff5000 #ff2d00 #ff5000'
+        - '#ff3700 #ff1900 #ff3700'
+        - '#ff1900 #ff3700 #ff1900'
+        - '#ff2d00 #ff2d00 #ff2d00'
+        - '#ff3700 #ff3700 #ff3700'
+        - '#ff5000 #ff5000 #ff5000'
+        - '#ff1900 #ff1900 #ff1900'
+        - '#ff2d00 #ff1900 #ff3700'
+        - '#ff3700 #ff2d00 #ff1900'
+        - '#ff1900 #ff3700 #ff2d00'
+        - '#ff5000 #ff5000 #ff2d00'

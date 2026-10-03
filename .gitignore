@@ -17,3 +17,7 @@ design/prints/
 
 # go build sem -o gera o binário na raiz
 /DMXController
+
+# Ouvido de bateria: ambiente Python com o Demucs, modelo e cache das baterias
+# separadas (instalado por scripts/instalar_ouvido.sh)
+.ouvido/

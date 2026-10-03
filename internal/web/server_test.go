@@ -24,10 +24,6 @@ import (
 // patch temporário.
 func newServer(t *testing.T, token string) (*httptest.Server, *control.Controller, *engine.Engine) {
 	t.Helper()
-	c, err := control.LoadConsole("../../config/console.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
 	patch := filepath.Join(t.TempDir(), "patch.yaml")
 	src, _ := os.ReadFile("../../config/patch.yaml")
 	os.WriteFile(patch, src, 0o644)
@@ -35,13 +31,17 @@ func newServer(t *testing.T, token string) (*httptest.Server, *control.Controlle
 	if err != nil {
 		t.Fatal(err)
 	}
-	rig, err := fixture.NewRig(fixtures, []int{1, 8, 15}, patch)
+	rig, err := control.NewRig(fixtures, patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := control.LoadConsole("../../config/console.yaml", control.Positions(rig))
 	if err != nil {
 		t.Fatal(err)
 	}
 	eng := &engine.Engine{}
 	ctl := control.NewController(c, eng, rig)
-	sh := show.New(t.TempDir(), show.NewPresets(c.Workspace, nil), eng, nil, c.Limits.Flash, ctl.Notice)
+	sh := show.New(t.TempDir(), show.NewPresets(c.Library, control.Positions(rig)), eng, nil, c.Limits.Flash, ctl.Notice)
 	srv := New(ctl, eng, sh, nil, nil, nil, token)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -138,6 +138,9 @@ func TestConfigAndPress(t *testing.T) {
 func TestTwoClientsSeeSameState(t *testing.T) {
 	hs, _, _ := newServer(t, "")
 	ipad, pc := dial(t, hs), dial(t, hs)
+	// Só aperta depois que o outro cliente está registrado (já recebeu a
+	// configuração); antes disso ele perderia o evento.
+	pc.waitFor("config", func(m map[string]any) bool { return m["type"] == "config" })
 	ipad.send(map[string]any{"type": "press", "id": 32}) // CORES FIXAS | BRANCO
 	// Evento e estado podem chegar em qualquer ordem.
 	var sawState, sawEvent bool

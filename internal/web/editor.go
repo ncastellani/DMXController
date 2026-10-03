@@ -49,7 +49,10 @@ func (s *Server) saveTimeline(file string, raw json.RawMessage) error {
 	}
 	// Campos que o editor não muda vêm da versão carregada.
 	t.Version, t.Song, t.Analysis.Beats, t.Analysis.Downbeats, t.Analysis.Energy = 1, cur.Song, cur.Analysis.Beats, cur.Analysis.Downbeats, cur.Analysis.Energy
-	t.Analysis.BPM, t.Analysis.Duration, t.Lyrics = cur.Analysis.BPM, cur.Analysis.Duration, cur.Lyrics
+	t.Analysis.Hits, t.Analysis.HitStrength, t.Analysis.Accents = cur.Analysis.Hits, cur.Analysis.HitStrength, cur.Analysis.Accents
+	t.Analysis.SoundEnd, t.Analysis.FadeOut = cur.Analysis.SoundEnd, cur.Analysis.FadeOut
+	t.Analysis.Drums, t.Analysis.HitKind = cur.Analysis.Drums, cur.Analysis.HitKind
+	t.Analysis.BPM, t.Analysis.Duration = cur.Analysis.BPM, cur.Analysis.Duration
 	if len(t.Analysis.Sections) != len(cur.Analysis.Sections) {
 		t.Analysis.Sections = cur.Analysis.Sections
 	}

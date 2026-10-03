@@ -16,7 +16,7 @@ import (
 	"github.com/ncastellani/DMXController/internal/dmx"
 	"github.com/ncastellani/DMXController/internal/engine"
 	"github.com/ncastellani/DMXController/internal/fixture"
-	"github.com/ncastellani/DMXController/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/library"
 )
 
 // Timeline é o conteúdo de musicas/<faixa>.json.
@@ -36,15 +36,7 @@ type Timeline struct {
 		BPM       float64 `json:"bpm_percebido"`
 	} `json:"ai,omitempty"`
 	Analysis Analysis `json:"analysis"`
-	Lyrics   []Lyric  `json:"lyrics,omitempty"` // letra transcrita da versão cantada
 	Cues     []Cue    `json:"cues"`
-}
-
-// Lyric é uma frase cantada, de T a End (segundos da música).
-type Lyric struct {
-	T    float64 `json:"t"`
-	End  float64 `json:"end"`
-	Text string  `json:"text"`
 }
 
 // Analysis é a grade da música (librosa).
@@ -53,11 +45,35 @@ type Analysis struct {
 	BPM       float64   `json:"bpm"`
 	Beats     []float64 `json:"beats"`
 	Downbeats []float64 `json:"downbeats"`
-	Energy    struct {
+	// Hits são os toques fortes da música (ataques de bateria, guitarra...),
+	// com pelo menos MinEffectStep entre um e outro; os efeitos do modo livre
+	// com sync "hits" trocam de passo neles.
+	Hits []float64 `json:"hits,omitempty"`
+	// Drums diz que a análise ouviu a bateria separada da música (o "ouvido
+	// de bateria"); HitKind é então a peça de cada toque de Hits, um caractere
+	// por toque: k = bumbo, s = caixa, h = chimbal, - = não é bateria.
+	Drums   bool   `json:"drums,omitempty"`
+	HitKind string `json:"hit_kind,omitempty"`
+	// HitStrength é a força percussiva de cada toque de Hits (0 a 1).
+	HitStrength []float64 `json:"hit_strength,omitempty"`
+	// Accents são os toques que se destacam dos vizinhos (uma virada, uma
+	// batida solta no meio do verso): a luz dá um realce neles.
+	Accents []Accent `json:"accents,omitempty"`
+	// SoundEnd é onde o som acaba (s) e FadeOut, a duração da cauda final:
+	// a luz vai até SoundEnd, apagando aos poucos durante a cauda.
+	SoundEnd float64 `json:"sound_end,omitempty"`
+	FadeOut  float64 `json:"fade_out,omitempty"`
+	Energy   struct {
 		Hop    float64   `json:"hop"`
 		Values []float64 `json:"values"`
 	} `json:"energy"`
 	Sections []Section `json:"sections"`
+}
+
+// Accent é um toque em destaque: T em segundos, V a força do realce (0 a 1).
+type Accent struct {
+	T float64 `json:"t"`
+	V float64 `json:"v"`
 }
 
 // Section é uma parte da música.
@@ -66,6 +82,7 @@ type Section struct {
 	End    float64 `json:"end"`
 	Bars   int     `json:"bars"`
 	Energy float64 `json:"energy"`
+	Pulse  float64 `json:"pulse,omitempty"` // batida: força da percussão na parte, 0 a 1
 	Group  string  `json:"group"`
 	Name   string  `json:"name"`
 }
@@ -74,11 +91,13 @@ type Section struct {
 type Cue struct {
 	T        float64 `json:"t"`
 	Layer    string  `json:"layer"` // base | flash
-	Kind     string  `json:"kind"`  // preset | blackout
+	Kind     string  `json:"kind"`  // preset | effect | blackout
 	Preset   string  `json:"preset,omitempty"`
+	Effect   *Effect `json:"effect,omitempty"` // kind effect (modo livre)
 	Name     string  `json:"name,omitempty"`
 	Rate     float64 `json:"rate,omitempty"`
 	Duration float64 `json:"duration,omitempty"`
+	Fade     float64 `json:"fade,omitempty"` // blackout: a luz apaga aos poucos nos Fade segundos antes dele
 	Note     string  `json:"note,omitempty"`
 }
 
@@ -122,16 +141,25 @@ func SortCues(cues []Cue) {
 // acende todos os canhões nessa cor.
 const ColorPrefix = "cor:"
 
-// Presets resolve ids de preset ("qlc:47", "cor:#c8a2c8") em Sources do engine.
+// Presets resolve ids de preset ("pista:chill", "cor:#c8a2c8") em Sources do engine.
 type Presets struct {
-	ws        *qlc.Workspace
-	positions []*fixture.Fixture // fixtures no quadro lógico, para as cores criadas
+	lib       *library.Library
+	positions []*fixture.Fixture // fixtures no quadro lógico, onde os presets são desenhados
 }
 
-// NewPresets cria o resolvedor a partir do workspace do QLC+. positions são
-// os canhões com endereço lógico (o quadro dos presets).
-func NewPresets(ws *qlc.Workspace, positions []*fixture.Fixture) *Presets {
-	return &Presets{ws: ws, positions: positions}
+// NewPresets cria o resolvedor a partir da biblioteca. positions são os
+// canhões com endereço lógico (o quadro dos presets).
+func NewPresets(lib *library.Library, positions []*fixture.Fixture) *Presets {
+	return &Presets{lib: lib, positions: positions}
+}
+
+// Canonical troca um id antigo de preset ("qlc:47", do tempo do QLC+) pelo
+// da biblioteca.
+func (p *Presets) Canonical(id string) string {
+	if strings.HasPrefix(id, ColorPrefix) {
+		return id
+	}
+	return p.lib.Canonical(id)
 }
 
 // ParseColor lê "#rrggbb" (com ou sem #).
@@ -171,17 +199,9 @@ func (p *Presets) Resolve(id string) (string, engine.Source, error) {
 		}
 		return fmt.Sprintf("COR | #%02x%02x%02x", c.R, c.G, c.B), colorSource{c, p.positions}, nil
 	}
-	num, ok := strings.CutPrefix(id, "qlc:")
+	name, src, ok := p.lib.Preset(id, p.positions)
 	if !ok {
-		return "", nil, fmt.Errorf("preset %q: origem desconhecida", id)
-	}
-	n, err := strconv.Atoi(num)
-	if err != nil {
-		return "", nil, fmt.Errorf("preset %q inválido", id)
-	}
-	name, src, ok := p.ws.Function(n)
-	if !ok {
-		return "", nil, fmt.Errorf("preset %q não existe no workspace", id)
+		return "", nil, fmt.Errorf("preset %q não existe na biblioteca", id)
 	}
 	return name, src, nil
 }
@@ -199,11 +219,38 @@ type step struct {
 type Program struct {
 	base  []step
 	flash []step
+	// Realce dos toques em destaque (Analysis.Accents) sobre a luz de base.
+	accents   []Accent
+	positions []*fixture.Fixture
+	fades     []fadeOut
 }
+
+// fadeOut é o trecho antes de um blackout em que a luz apaga aos poucos.
+type fadeOut struct{ from, to time.Duration }
+
+// O realce de um pico da música: o canhão do centro dá um flash branco (até
+// branco total num pico cheio) e os dos lados clareiam de leve (accentSide),
+// voltando à luz de base em accentDecay. Segurança: nunca apaga nada, não
+// liga strobo e dois realces ficam a pelo menos accentMinGap um do outro
+// (menos de 1 por segundo), mesmo num arquivo editado à mão.
+const (
+	accentSide   = 0.3
+	accentDecay  = 280 * time.Millisecond
+	accentMinGap = time.Second
+)
+
+// maxCueFade é o fade mais longo de um blackout (s).
+const maxCueFade = 30.0
 
 // Compile resolve os presets da timeline. Flashes são limitados a maxFlash.
 func Compile(t *Timeline, presets *Presets, maxFlash time.Duration) (*Program, error) {
-	p := &Program{}
+	p := &Program{positions: presets.positions}
+	for _, a := range t.Analysis.Accents {
+		if n := len(p.accents); a.V > 0 && (n == 0 || secs(a.T-p.accents[n-1].T) >= accentMinGap) {
+			a.V = min(1, a.V)
+			p.accents = append(p.accents, a)
+		}
+	}
 	for i := range t.Cues {
 		c := &t.Cues[i]
 		s := step{at: secs(c.T), rate: c.Rate, cue: c}
@@ -212,6 +259,7 @@ func Compile(t *Timeline, presets *Presets, maxFlash time.Duration) (*Program, e
 		}
 		switch c.Kind {
 		case "preset":
+			c.Preset = presets.Canonical(c.Preset)
 			name, src, err := presets.Resolve(c.Preset)
 			if err != nil {
 				return nil, fmt.Errorf("cue %d (%.2fs): %w", i, c.T, err)
@@ -220,9 +268,28 @@ func Compile(t *Timeline, presets *Presets, maxFlash time.Duration) (*Program, e
 			if c.Name == "" {
 				c.Name = name
 			}
+		case "effect": // modo livre: só na base, sempre no andamento da música
+			if c.Layer != "base" {
+				return nil, fmt.Errorf("cue %d (%.2fs): efeito só vale na camada base", i, c.T)
+			}
+			name, src, err := presets.Effect(c.Effect, &t.Analysis, c.T)
+			if err != nil {
+				return nil, fmt.Errorf("cue %d (%.2fs): %w", i, c.T, err)
+			}
+			s.src, s.rate = src, 1
+			c.Preset, c.Rate = "", 0
+			if c.Name == "" {
+				c.Name = name
+			}
 		case "blackout":
+			if c.Fade = max(0, min(maxCueFade, c.Fade)); c.Fade > 0 && c.Layer == "base" {
+				p.fades = append(p.fades, fadeOut{s.at - secs(c.Fade), s.at})
+			}
 		default:
 			return nil, fmt.Errorf("cue %d (%.2fs): tipo %q desconhecido", i, c.T, c.Kind)
+		}
+		if c.Kind != "effect" {
+			c.Effect = nil
 		}
 		switch c.Layer {
 		case "base":
@@ -246,11 +313,40 @@ func Compile(t *Timeline, presets *Presets, maxFlash time.Duration) (*Program, e
 func (p *Program) Render(pos time.Duration, f *dmx.Frame) {
 	if b := p.baseAt(pos); b != nil && b.src != nil {
 		b.src.Render(time.Duration(float64(pos-b.at)*b.rate), f)
+		p.bump(pos, f)
+		for _, fo := range p.fades {
+			if pos >= fo.from && pos < fo.to {
+				for _, fx := range p.positions {
+					fx.Dim(f, float64(fo.to-pos)/float64(fo.to-fo.from))
+				}
+			}
+		}
 	}
 	for i := range p.flash {
 		if s := &p.flash[i]; pos >= s.at && pos < s.end {
 			s.src.Render(pos-s.at, f)
 		}
+	}
+}
+
+// bump aplica o realce do toque em destaque mais recente, se ainda dura.
+func (p *Program) bump(pos time.Duration, f *dmx.Frame) {
+	i := sort.Search(len(p.accents), func(i int) bool { return secs(p.accents[i].T) > pos })
+	if i == 0 {
+		return
+	}
+	a := p.accents[i-1]
+	since := pos - secs(a.T)
+	if since >= accentDecay {
+		return
+	}
+	left := 1 - float64(since)/float64(accentDecay)
+	for i, fx := range p.positions {
+		amount := a.V * left * left
+		if i != len(p.positions)/2 { // só o do centro vai ao branco
+			amount *= accentSide
+		}
+		fx.Bump(f, amount)
 	}
 }
 

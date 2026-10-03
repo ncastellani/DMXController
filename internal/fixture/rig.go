@@ -14,7 +14,7 @@ import (
 // canhões físicos.
 //
 // Os presets são escritos num quadro "lógico" em que cada posição ocupa um
-// bloco fixo de canais (o layout do workspace do QLC+). Na saída, cada bloco
+// bloco fixo de canais (blocos seguidos a partir do canal 1). Na saída, cada bloco
 // é copiado para o endereço DMX do canhão que está naquela posição. Trocar
 // canhões de posição é só trocar os endereços.
 type Rig struct {

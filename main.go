@@ -1,9 +1,10 @@
-// DMXController é o servidor do show: toca os modos de pista, cores e strobos do
-// workspace do QLC+ e serve a interface web (iPad/computador), com prévia
+// DMXController é o servidor do show: toca os modos de pista, cores e strobos da
+// biblioteca (config/biblioteca.yaml) e serve a interface web (iPad/computador), com prévia
 // dos canhões em tempo real. Todo o controle é feito pela interface.
 //
 //	DMXController [opções]                 servidor do show (interface web)
 //	DMXController analisar [opções] <...>  gera as timelines de uma pasta (ver analisar.go)
+//	DMXController biblioteca [opções]      avalia com a IA o clima dos modos de pista (ver biblioteca.go)
 package main
 
 import (
@@ -40,6 +41,12 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "biblioteca" {
+		if err := biblioteca(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
@@ -47,7 +54,7 @@ func main() {
 
 func run() error {
 	device := flag.String("dev", "auto", `porta serial da interface, "auto" ou "mock" (só prévia)`)
-	consolePath := flag.String("console", "config/console.yaml", "botões do show")
+	consolePath := flag.String("console", "config/console.yaml", "botões do show (aponta para a biblioteca de presets)")
 	profiles := flag.String("profiles", "config/fixtures.yaml", "perfis de fixtures")
 	patch := flag.String("patch", "config/patch.yaml", "posições e endereços dos canhões")
 	addr := flag.String("web", ":8080", "endereço da interface web")
@@ -56,6 +63,7 @@ func run() error {
 	// Um arquivo por sistema: ids de saída e endereços Bluetooth mudam de formato.
 	showDMX := flag.Bool("ver-dmx", false, "mostra no terminal os canais DMX enviados (quando mudam, até 10 linhas/s)")
 	model := flag.String("modelo", analysis.DefaultModel, "modelo do OpenRouter para analisar músicas novas")
+	earDir := flag.String("ouvido", ".ouvido", "pasta do ouvido de bateria (separa a bateria na análise; instale com scripts/instalar_ouvido.sh)")
 	soundPath := flag.String("som", "config/som-"+runtime.GOOS+".yaml", "preferências de som (atraso, volume, saída, caixa)")
 	flag.Parse()
 
@@ -63,14 +71,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	console, err := control.LoadConsole(*consolePath)
+	rig, err := control.NewRig(fixtures, *patch)
 	if err != nil {
 		return err
 	}
-	for _, s := range console.Skipped {
-		log.Printf("aviso: function ignorada: %s", s)
-	}
-	rig, err := control.NewRig(fixtures, console, *patch)
+	positions := control.Positions(rig) // endereços lógicos (o quadro dos presets)
+	console, err := control.LoadConsole(*consolePath, positions)
 	if err != nil {
 		return err
 	}
@@ -126,11 +132,7 @@ func run() error {
 		log.Printf("aviso: sem saída de som (%v); a luz do show segue um relógio interno", err)
 		player = nil
 	}
-	var positions []*fixture.Fixture // endereços lógicos (o quadro dos presets)
-	for i := range rig.Fixtures {
-		positions = append(positions, rig.Logical(i))
-	}
-	sh := show.New(*songsDir, show.NewPresets(console.Workspace, positions), eng, player, console.Limits.Flash, ctl.Notice)
+	sh := show.New(*songsDir, show.NewPresets(console.Library, positions), eng, player, console.Limits.Flash, ctl.Notice)
 	if err := sh.Scan(); err != nil {
 		log.Printf("aviso: setlist: %v", err)
 	}
@@ -147,8 +149,11 @@ func run() error {
 	go snd.Run(ctx)
 
 	srv := web.New(ctl, eng, sh, player, snd, health, *token)
-	importer := &web.Importer{Dir: *songsDir, Catalog: analysis.Catalog(console, positions), APIKey: analysis.APIKey(".env"), Model: *model}
+	importer := &web.Importer{Dir: *songsDir, Catalog: analysis.Catalog(console), APIKey: analysis.APIKey(".env"), Model: *model, Library: console.Library, Separator: analysis.FindSeparator(*earDir)}
 	srv.SetImporter(importer)
+	if importer.Separator == nil {
+		log.Print("aviso: sem o ouvido de bateria (scripts/instalar_ouvido.sh): a batida das músicas novas será estimada na música inteira")
+	}
 	if importer.APIKey == "" {
 		log.Print("aviso: sem OPENROUTER_API_KEY (.env ou ambiente): músicas novas serão analisadas só por regras")
 	}

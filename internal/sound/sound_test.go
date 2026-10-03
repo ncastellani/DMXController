@@ -152,6 +152,12 @@ func TestManagerSettings(t *testing.T) {
 	if !strings.Contains(string(data), "latency_ms: 1000") {
 		t.Fatalf("som.yaml:\n%s", data)
 	}
+	m.SetLatency(-120) // som adiantado: a luz é que adianta
+	m.save()
+	data, _ = os.ReadFile(path)
+	if p.lat != -120*time.Millisecond || !strings.Contains(string(data), "latency_ms: -120") {
+		t.Fatalf("atraso negativo: player %v, som.yaml:\n%s", p.lat, data)
+	}
 }
 
 func TestManagerReconnectsSpeaker(t *testing.T) {

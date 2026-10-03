@@ -36,6 +36,9 @@ type Profile struct {
 	Name     string         `yaml:"name"`
 	Channels []Role         `yaml:"channels"`
 	Fixed    map[Role]uint8 `yaml:"fixed"` // valores constantes (ex.: mode)
+	// StrobeMode é o valor do canal mode que liga o strobo nativo (a
+	// velocidade vai no canal speed); 0 = o perfil não tem strobo.
+	StrobeMode uint8 `yaml:"strobe_mode"`
 }
 
 // Color é uma cor RGB.
@@ -45,6 +48,7 @@ type Color struct{ R, G, B uint8 }
 type State struct {
 	Color     Color
 	Intensity float64 // 0..1
+	Strobe    uint8   // > 0: strobo nativo nessa velocidade (canal speed)
 }
 
 // Fixture é um canhão patcheado num endereço.
@@ -84,8 +88,49 @@ func (f *Fixture) Render(frame *dmx.Frame, s State) {
 			v = scale(s.Color.B)
 		default:
 			v = f.Profile.Fixed[role]
+			if s.Strobe > 0 && f.Profile.StrobeMode > 0 {
+				switch role {
+				case Mode:
+					v = f.Profile.StrobeMode
+				case Speed:
+					v = s.Strobe
+				}
+			}
 		}
 		frame.Set(f.Address+i, v)
+	}
+}
+
+// Bump clareia o que o fixture está emitindo no quadro: leva o dimmer e as
+// cores em direção ao máximo (branco) na proporção amount (0..1). É o realce
+// de um toque em destaque; não mexe nos canais de função (strobo).
+func (f *Fixture) Bump(frame *dmx.Frame, amount float64) {
+	amount = clamp01(amount)
+	for i, role := range f.Profile.Channels {
+		switch role {
+		case Dimmer, Red, Green, Blue:
+			v := float64(frame[f.Address+i-1])
+			frame.Set(f.Address+i, byte(v+(255-v)*amount+0.5))
+		}
+	}
+}
+
+// Dim escurece o que o fixture está emitindo no quadro para a fração factor
+// (0..1) do brilho: pelo dimmer ou, sem canal de dimmer, pelas cores.
+func (f *Fixture) Dim(frame *dmx.Frame, factor float64) {
+	factor = clamp01(factor)
+	scale := []Role{Red, Green, Blue}
+	for _, r := range f.Profile.Channels {
+		if r == Dimmer {
+			scale = []Role{Dimmer}
+		}
+	}
+	for i, role := range f.Profile.Channels {
+		for _, r := range scale {
+			if role == r {
+				frame.Set(f.Address+i, byte(float64(frame[f.Address+i-1])*factor+0.5))
+			}
+		}
 	}
 }
 

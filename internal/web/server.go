@@ -42,6 +42,9 @@ type Server struct {
 	health *Health
 	token  string
 
+	effectsOnce sync.Once
+	effects     []effectMsg // os modos de pista como efeito (config), calculados uma vez
+
 	mu          sync.Mutex
 	clients     map[*client]bool
 	events      []eventMsg
@@ -80,7 +83,6 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", http.FileServerFS(sub))
 	mux.HandleFunc("/ws", s.serveWS)
 	mux.HandleFunc("/api/upload", s.serveUpload)
-	mux.HandleFunc("/api/lyrics", s.serveLyrics)
 	mux.HandleFunc("/api/timeline", s.serveTimeline)
 	mux.HandleFunc("/api/preview", s.servePreview)
 	mux.HandleFunc("/api/audio", s.serveAudio)
@@ -248,8 +250,8 @@ type inMsg struct {
 	Timeline json.RawMessage `json:"timeline"` // timeline editada
 	AI       bool            `json:"ai"`       // analyze: usar a IA
 	Temp     string          `json:"temp"`     // analyze: auto | quente | fria
-	Lyrics   *string         `json:"lyrics"`   // analyze: letra (null = manter a guardada)
-	NoVoice  bool            `json:"noVoice"`  // analyze: apagar a versão cantada antes
+	Free     bool            `json:"free"`     // analyze: modo livre (efeitos criados para a música)
+	Mix      bool            `json:"mix"`      // analyze: modo misto (presets e efeitos combinados)
 }
 
 func (s *Server) handle(c *client, m *inMsg, now time.Time) error {
