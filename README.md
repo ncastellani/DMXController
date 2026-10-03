@@ -85,7 +85,16 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
   gerada. Num efeito, dá para mudar a cor de cada canhão em cada passo, o
   tempo do passo e o fade. Duas vistas do palco: pendurados (padrão) e **no
   chão, como no show** (os das pontas cruzando, o do centro para a plateia).
-  A prévia não acende os canhões.
+  A prévia não acende os canhões, a não ser com **Ver nos canhões**.
+- **Ver nos canhões** (no editor): leva a prévia aos canhões de verdade, em
+  tempo real. A luz segue a posição da prévia (tocando, pausada ou pulando
+  na barra) e cada edição vale na hora, assim que é salva (menos de 1 s).
+  Pausada, a luz fica parada no quadro daquele instante, sem strobo. O som
+  continua saindo no aparelho da prévia, não na caixa do show. Desliga
+  sozinho quando o show começa a tocar, com PARAR TUDO, ao trocar de música
+  ou de aba, ao esconder a página ou se o aparelho para de responder por
+  2 s. Não liga com a música do show tocando. Um aparelho por vez: o último
+  que ligou conduz. Presets manuais ficam por cima, e o blackout apaga.
 - **PARAR TUDO** (luz manual, blackout **e a música**) e **BLACKOUT** sempre
   à mão.
 - **Manual**: um controle por canal de cada canhão, para testar a interface
@@ -199,7 +208,8 @@ Ctrl+C apaga os canhões e encerra.
 
 1. Na aba **Músicas**, envie os `.wav` e analise. Toque em cada música e
    confira a luz na prévia (o som sai no computador ou iPad, não na caixa),
-   ajustando no editor.
+   ajustando no editor. Com **Ver nos canhões**, a prévia acende os canhões
+   de verdade e cada ajuste aparece neles na hora.
 2. Em **Posições**, confirme a ordem dos canhões com "Identificar".
 3. Em **Som**, escolha a saída e calibre o atraso: os canhões piscam em
    branco a cada clique; ajuste até a piscada cair junto com o clique que
@@ -274,7 +284,11 @@ dele (é o que o modo livre usa para escolher):
   pelo menos 20 s uma da outra.
 - **Flash branco nos picos**: dois ficam a pelo menos 1 s, e ele não liga o
   strobo.
-- **PARAR TUDO** para luz manual, blackout e a música.
+- **Ver nos canhões** (prévia levada à luz de verdade): strobo e fritação
+  piscam nos canhões só com a prévia tocando; pausada, a luz fica parada e
+  sem strobo. Sem notícia do navegador por 2 s (`LiveTTL`), a luz sai; a
+  página desliga ao ser escondida, ao trocar de aba e ao desconectar.
+- **PARAR TUDO** para luz manual, blackout, a música e a prévia nos canhões.
 
 ## Arquivos e configuração
 
@@ -655,7 +669,8 @@ de pista e "Trocar por um preset…" desfaz.
 - `flash` é limitado a `limits.flash` do console (10 s).
 - Qualquer `blackout` aceita `fade`, até 30 s.
 - A camada Show só desenha com a música tocando: carregada, parada ou
-  pausada = preto.
+  pausada = preto. A exceção é a prévia levada aos canhões ("Ver nos
+  canhões"), que pausada mostra o quadro parado.
 - Presets acionados à mão durante a música ficam **por cima** da timeline
   e, ao serem desligados, a timeline volta.
 - `DMXController analisar` **não sobrescreve** um JSON existente (pode ter
@@ -698,10 +713,18 @@ Conexão: WebSocket em `/ws` (mesmo host da página). Mensagens JSON com campo
   com `effect {type: "sequence", name, steps, fade}` e `sync: "hits"` (ou,
   com `stepMs` ≥ 1000, `beats` = o passo original em batidas).
 
+**`hello`** — a primeira mensagem da conexão: o id deste navegador no
+servidor (para saber se é ele quem conduz a prévia nos canhões).
+
+```json
+{ "type": "hello", "client": "web3" }
+```
+
 **`state`** — sempre que algo muda (até ~30×/s).
 
 ```json
 { "type": "state", "blackout": false, "identify": -1, "show": "",
+  "live": { "file": "", "by": "" },
   "active": { "base": 8, "strobe": -1, "flash": -1 },
   "health": { "dmx": true, "audio": true },
   "positions": [ { "name": "esquerda", "address": 1, "color": "#ff2a6d", "strobe": false,
@@ -716,6 +739,9 @@ Conexão: WebSocket em `/ws` (mesmo host da página). Mensagens JSON com campo
 - `identify`: posição sendo identificada (acesa em branco), `-1` = nenhuma.
 - `show`: título da música cuja timeline está conduzindo a luz (`""` =
   nenhuma).
+- `live`: a prévia da aba Músicas nos canhões. `file` = a música (`X.json`
+  da setlist; `""` = desligada) e `by` = o `client` do `hello` do navegador
+  que conduz.
 - `health`: os alertas da barra do topo. `dmx: false` = interface DMX
   desconectada (motivo em `dmxError`); `audio: false` = sem saída de som
   (motivo em `audioError`); `warnings` = avisos fixos (ex.: o programa
@@ -816,6 +842,14 @@ pode ser negativo.
 - A música só é marcada `pronta` depois de entrar na setlist; ao terminar,
   chega um `setlist` novo.
 
+**`liveError`** — só ao navegador que pediu a prévia nos canhões, quando
+ela não liga (música do show tocando, música fora da setlist, timeline
+inválida).
+
+```json
+{ "type": "liveError", "file": "X.json", "error": "a música do show está tocando: ..." }
+```
+
 **`event`** / **`events`** — log (`events` traz o histórico ao conectar).
 
 ```json
@@ -837,6 +871,9 @@ pode ser negativo.
 | `{"type":"release","pos":P}` | solta os canais manuais da posição (`-1` = todas) |
 | `{"type":"swap","a":P,"b":Q}` | troca canhões de posição (grava o patch) |
 | `{"type":"identify","pos":P}` | acende só aquele canhão por 3 s |
+| `{"type":"live","str":"X.json","down":true,"t":S,"playing":B}` | liga (ou assume, se outro aparelho conduzia) a prévia nos canhões: a luz da música `X.json` na posição `S` s, tocando ou parada. Recusada com a música do show tocando (chega um `liveError`) |
+| `{"type":"live","str":"X.json","down":true,"t":S,"playing":B,"arg":"sync"}` | a posição da prévia: **a cada 0,5 s** e a cada play, pausa e pulo. De quem não conduz, é ignorada. Sem nenhuma por 2 s, a prévia sai dos canhões |
+| `{"type":"live","down":false}` | desliga a prévia nos canhões (só de quem conduz) |
 | `{"type":"scan"}` | relê a pasta da setlist |
 | `{"type":"reorder","files":["b.json","a.json"]}` | nova ordem da setlist |
 | `{"type":"link","str":"a.json","down":true,"t":0.5}` | emendar `a.json` com a próxima depois de `t` s (`down:false` desliga) |
@@ -922,6 +959,8 @@ A música é sempre o `file` da `setlist` (`X.json`); fora dela, `404`.
 
 - Soltar todas as fritações ao perder foco ou visibilidade e ao desconectar
   (o servidor também solta, mas assim é imediato).
+- Desligar a prévia nos canhões ao perder a visibilidade e ao sair da aba
+  (o servidor também tira, sem aviso por 2 s), e religá-la ao reconectar.
 - Não piscar a tela para representar strobo: usar um indicador. A exceção é
   a prévia da aba Músicas (ver [Segurança](#segurança-fotossensibilidade)).
 - Reconectar sozinha; as mensagens enviadas ao conectar reconstroem a tela.
@@ -944,8 +983,8 @@ pacotes de `internal/`:
   `config/patch.yaml`. `Look` lê de um quadro a cor que o canhão emite.
 - **`library`**: a biblioteca de presets (`config/biblioteca.yaml`): cores,
   strobos e modos de pista.
-- **`engine`**: camadas **Show (timeline da música) < Base < Strobe < Flash
-  < Identify**, com os canais manuais por cima; o blackout zera tudo. A
+- **`engine`**: camadas **Show (timeline da música) < Live (prévia nos
+  canhões) < Base < Strobe < Flash < Identify**, com os canais manuais por cima; o blackout zera tudo. A
   camada mais alta define o quadro inteiro (no QLC+ era HTP e misturava
   cores).
 - **`control`**: `Console` (os botões de `config/console.yaml`, cada um com
@@ -960,7 +999,12 @@ pacotes de `internal/`:
   `Remove(file, move)` tira da setlist (recusa a que toca, descarrega a
   carregada; os arquivos saem antes do `Scan`/`requeue`, para ela não ser
   emendada). `RenderPreview` = a luz de uma música amostrada canhão a
-  canhão.
+  canhão. `live.go` = a prévia nos canhões: `Live(owner, file, t, playing,
+  sync)` desenha o `Program` da música na posição avisada pelo navegador
+  (relógio próprio entre os avisos, corrigido acima de 60 ms de diferença),
+  `Update` troca o programa dela na hora, `Play`/`Calibrate`/`Remove` a
+  tiram, e `ExpireLive` a tira sem aviso por `LiveTTL` ou quando o dono
+  desconecta. Tem lock próprio (o engine chama o `Render` dela).
 - **`audio`**: WAV → PCM 16 bits, estéreo, 44,1 kHz. `Player` (oto/v3, sem
   cgo: CoreAudio no Mac, PulseAudio/PipeWire/ALSA no Linux) toca um fluxo
   (`Load`, `Append(gap)`, `Truncate`, `Release`). `Position` desconta o
@@ -997,6 +1041,9 @@ pacotes de `internal/`:
   transcrição, cor acendendo na palavra citada, "Ouvir com voz"). Não trazer
   de volta nem sugerir.
 - **Padrão é tudo apagado**: a camada Show só desenha com a música tocando.
+  A prévia nos canhões só acende depois de a pessoa ligar "Ver nos canhões".
+- **O show tem prioridade sobre a prévia nos canhões**: ela não liga com a
+  música do show tocando e sai quando o show começa.
 - **Presets manuais ficam por cima da timeline**, e ela volta quando saem.
 - **Sem QLC+** (decisão de 03/10/2026): o programa não lê mais `.qxw`.
   Presets novos ou alterados vão direto em `config/biblioteca.yaml`; não
@@ -1057,7 +1104,7 @@ gofmt -l .
 
 ## Estado atual e próximos passos
 
-Atualizado em 03/10/2026, depois da 7ª sessão de desenvolvimento.
+Atualizado em 03/10/2026, depois da 8ª sessão de desenvolvimento.
 
 Tudo o que este README descreve está pronto e foi testado no Linux: a suíte
 de testes passa, e as funções foram conferidas com a IA de verdade e pela
@@ -1077,6 +1124,10 @@ esperado.
 
 - **Raspberry Pi e Mac**: nada foi testado em nenhum dos dois.
 - **Prévia com som no iPad/Safari.**
+- **Ver nos canhões com canhões de verdade**: conferido só pelo log de canais
+  (`-ver-dmx`) e no Chrome headless. O atraso do som do aparelho da prévia
+  (ex.: fone Bluetooth no iPad) não é compensado: a luz pode sair um pouco
+  antes do som.
 - **Canhões de verdade**: os efeitos (o `pulse` usa o canal de dimmer do
   MM-T114; se a curva dele for brusca, o pulso pode parecer degrau) e o
   flash dos picos. Os presets da biblioteca geram o mesmo DMX de antes, byte
@@ -1232,5 +1283,10 @@ programa.
     intro sem bateria dava 10 flashes.
   - A fila de análise passou a marcar "pronta" só depois de a música entrar
     na setlist (era uma corrida que aparecia com a máquina carregada).
+- **8ª (03/10/2026)**: **Ver nos canhões** ("além de exibir no preview, a
+  opção de visualizar nos canhões… em tempo real a edição"): a prévia do
+  editor levada à luz de verdade, numa camada própria do engine (Live), com
+  as edições valendo na hora. Primeira versão compilada para o Mac M2
+  (`darwin/arm64`).
 - **Entre a 5ª e a 7ª**: a calibração do atraso do som passou a aceitar
   valor negativo.

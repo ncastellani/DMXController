@@ -130,6 +130,7 @@
     open() {
       this.readyState = 1;
       if (this.onopen) this.onopen();
+      this.emit({ type: "hello", client: "demo" });
       this.emit(D.config);
       this.emit({ type: "events", items: this.events });
       this.emitSetlist();
@@ -203,10 +204,18 @@
         case "blackout": s.blackout = !s.blackout; this.event("blackout " + (s.blackout ? "ligado" : "desligado")); break;
         case "stopStrobe": if (s.active.strobe >= 0) { this.event("■ " + byId(s.active.strobe).caption); s.active.strobe = -1; } break;
         case "stopAll":
-          s.active = { base: -1, strobe: -1, flash: -1 }; s.held = []; s.blackout = false; s.identify = -1;
+          s.active = { base: -1, strobe: -1, flash: -1 }; s.held = []; s.blackout = false; s.identify = -1; s.live = null;
           for (const p of s.positions) p.manual = p.manual.map(() => null);
           this.event("parar tudo"); break;
         case "manual": s.positions[m.pos].manual[m.ch] = m.value; break;
+        case "live": { // prévia da aba Músicas nos canhões
+          if (!m.down) { if (s.live) this.event("◉ prévia saiu dos canhões: " + s.live.title); s.live = null; break; }
+          if (m.arg === "sync" && !s.live) break;
+          const so = this.songOf(m.str); if (!so) break;
+          if (!s.live || s.live.file !== m.str) this.event("◉ prévia nos canhões: " + so.title);
+          s.live = { file: m.str, title: so.title, t: m.t, playing: !!m.playing, at: performance.now() };
+          break;
+        }
         case "release": s.positions.forEach((p, i) => { if (m.pos === -1 || m.pos === i) p.manual = p.manual.map(() => null); }); break;
         case "swap": {
           const a = s.positions[m.a], c = s.positions[m.b];
@@ -220,7 +229,7 @@
           if (D.songs[m.id].error) { this.event("web: " + D.songs[m.id].error); return; }
           s.song = m.id; s.tl = this.tlOf(this.fileOf(m.id)); s.pos = 0; s.playing = false; s.calibrating = false;
           this.emit({ type: "timeline", timeline: s.tl, edited: !!D.songs[m.id].edited }); this.event("♪ carregada: " + D.songs[m.id].title); break;
-        case "play": if (s.song < 0 && !s.calibrating) { this.event("web: nenhuma música carregada"); break; } s.playing = true; this.event("▶ " + (s.calibrating ? "calibração" : D.songs[s.song].title)); break;
+        case "play": if (s.song < 0 && !s.calibrating) { this.event("web: nenhuma música carregada"); break; } if (s.live) { this.event("◉ prévia saiu dos canhões: " + s.live.title + " (o show começou)"); s.live = null; } s.playing = true; this.event("▶ " + (s.calibrating ? "calibração" : D.songs[s.song].title)); break;
         case "pause": s.playing = false; this.event("❚❚ pausa"); break;
         case "stop": s.playing = false; s.pos = 0; if (s.calibrating) { s.calibrating = false; s.song = -1; this.event("calibração encerrada"); } else this.event("■ parada"); break;
         case "seek": s.pos = Math.max(0, Math.min(m.t, this.duration())); break;
@@ -306,6 +315,7 @@
       else if (s.active.strobe >= 0) set(() => ({ color: byId(s.active.strobe).color || "#ffffff", strobe: true }));
       else if (s.active.base >= 0) { const b = byId(s.active.base); set((i) => ({ color: b.group === "CORES FIXAS" ? b.color : animate(b.color, i) })); }
       else if (s.calibrating) { const on = (s.pos % 0.6) < 0.09; set(() => ({ color: on ? "#ffffff" : "#000000" })); }
+      else if (s.live) { const lv = s.live, t = lv.t + (lv.playing ? (performance.now() - lv.at) / 1000 : 0); set((i) => ({ ...songLook(this.tlOf(lv.file), t, i), ...(lv.playing ? {} : { strobe: false }) })); }
       else if (s.song >= 0 && s.playing) set((i) => songLook(s.tl, s.pos, i)); // parada ou pausada: luz apagada
       return out;
     }
@@ -325,7 +335,7 @@
       this.emit({
         type: "state", blackout: s.blackout, identify: s.identify, active: s.active,
         show: s.song >= 0 && !s.calibrating ? D.songs[s.song].title : s.calibrating ? "calibração" : "",
-        health: { dmx: true, audio: true },
+        health: { dmx: true, audio: true }, live: { file: s.live ? s.live.file : "", by: s.live ? "demo" : "" },
         positions: s.positions.map((p, i) => {
           let [r, g, b] = rgb(cols[i].color), dim = 255;
           const m = p.manual;

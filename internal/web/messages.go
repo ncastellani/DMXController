@@ -54,8 +54,29 @@ type stateMsg struct {
 	Active    map[string]int `json:"active"` // camada → id do botão (-1 = nada)
 	Identify  int            `json:"identify"`
 	Show      string         `json:"show"` // música conduzindo a luz ("" = nenhuma)
+	Live      liveMsg        `json:"live"` // a prévia da aba Músicas nos canhões
 	Health    healthMsg      `json:"health"`
 	Positions []positionMsg  `json:"positions"`
+}
+
+// liveMsg diz qual música a prévia leva aos canhões (file vazio = nenhuma)
+// e qual navegador a conduz (by = o client do hello dele).
+type liveMsg struct {
+	File string `json:"file"`
+	By   string `json:"by"`
+}
+
+// helloMsg é a primeira mensagem da conexão: o id deste navegador.
+type helloMsg struct {
+	Type   string `json:"type"`
+	Client string `json:"client"`
+}
+
+// liveErrorMsg vai só ao navegador que pediu a prévia nos canhões.
+type liveErrorMsg struct {
+	Type  string `json:"type"`
+	File  string `json:"file"`
+	Error string `json:"error"`
 }
 
 type positionMsg struct {
@@ -140,6 +161,8 @@ func (s *Server) snapshot() stateMsg {
 	frame := s.eng.Last()
 	m := stateMsg{Type: "state", Blackout: st.Blackout, Identify: st.Identify, Active: map[string]int{}}
 	m.Show = s.eng.Status().Names[engine.Show]
+	lv := s.show.LiveStatus()
+	m.Live = liveMsg{File: lv.File, By: lv.Owner}
 	m.Health = s.health.snapshot()
 	for _, l := range []engine.Layer{engine.Base, engine.Strobe, engine.Flash} {
 		m.Active[l.String()] = id(st.Active[l])

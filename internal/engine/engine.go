@@ -19,6 +19,7 @@ type Layer int
 
 const (
 	Show     Layer = iota // timeline da música tocando (automático)
+	Live                  // prévia da aba Músicas levada aos canhões
 	Base                  // modo de pista ou cor fixa
 	Strobe                // strobo contínuo (toggle)
 	Flash                 // momentâneo, enquanto o botão estiver segurado
@@ -27,7 +28,7 @@ const (
 )
 
 func (l Layer) String() string {
-	return [...]string{"show", "base", "strobe", "flash", "identify"}[l]
+	return [...]string{"show", "live", "base", "strobe", "flash", "identify"}[l]
 }
 
 type slot struct {

@@ -115,6 +115,16 @@ func (f *Fixture) Bump(frame *dmx.Frame, amount float64) {
 	}
 }
 
+// Steady desliga o strobo nativo do fixture no quadro: os canais de função
+// voltam aos valores fixos do perfil e a cor fica parada.
+func (f *Fixture) Steady(frame *dmx.Frame) {
+	for i, role := range f.Profile.Channels {
+		if role == Mode || role == Speed {
+			frame.Set(f.Address+i, f.Profile.Fixed[role])
+		}
+	}
+}
+
 // Dim escurece o que o fixture está emitindo no quadro para a fração factor
 // (0..1) do brilho: pelo dimmer ou, sem canal de dimmer, pelas cores.
 func (f *Fixture) Dim(frame *dmx.Frame, factor float64) {

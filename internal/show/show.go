@@ -89,6 +89,8 @@ type Show struct {
 	gen      int  // muda a cada carga/parada: invalida emendas sendo preparadas
 	queued   string
 	onChange func()
+
+	live live // a prévia da aba Músicas nos canhões (lock próprio)
 }
 
 // New cria o show. player pode ser nil (sem saída de som).
@@ -284,6 +286,9 @@ func (s *Show) Remove(file string, move func(Song) error) error {
 	song, ok := s.Song(file)
 	if !ok {
 		return fmt.Errorf("música %q não está na setlist", file)
+	}
+	if s.liveSong(song.JSON) {
+		s.StopLive("música removida")
 	}
 	if s.Current() == song.JSON {
 		if s.head.playing() {
@@ -492,6 +497,7 @@ func (s *Show) Play() error {
 	if !s.head.playing() && s.head.stream() >= s.head.end() {
 		s.head.seek(seg.start) // terminou: toca a atual de novo
 	}
+	s.StopLive("o show começou")
 	s.head.play()
 	s.mu.Lock()
 	cal, gen := s.cal, s.gen
@@ -516,6 +522,7 @@ func (s *Show) Calibrate(flash engine.Source) error {
 	if s.head.player == nil {
 		return errors.New("sem saída de som para calibrar")
 	}
+	s.StopLive("calibração do som")
 	const dur = 5 * time.Minute
 	s.head.load(audio.Clicks(CalibrationBPM, dur), pseg{dur: dur, prog: clicks{flash}})
 	s.mu.Lock()
@@ -622,6 +629,7 @@ func (s *Show) Update(path string, t *Timeline) error {
 		return err
 	}
 	s.head.setProgram(path, prog, t)
+	s.liveProgram(path, prog, t)
 	s.mu.Lock()
 	current := s.prog != nil && s.cur >= 0 && s.cur < len(s.songs) && s.songs[s.cur].JSON == path
 	if current {

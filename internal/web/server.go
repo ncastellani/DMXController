@@ -123,6 +123,7 @@ func (s *Server) Run(ctx context.Context) {
 		}
 		if i%3 == 0 {
 			s.sendPlayer(false)
+			s.show.ExpireLive("", time.Now()) // navegador sumiu sem fechar a conexão
 		}
 		msg, err := json.Marshal(s.snapshot())
 		if err != nil {
@@ -176,6 +177,8 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 	hist, _ := json.Marshal(eventsMsg{Type: "events", Items: append([]eventMsg{}, s.events...)})
 	setlist, _ := json.Marshal(s.setlist())
 	tl, _ := json.Marshal(s.timelineMsg())
+	hello, _ := json.Marshal(helloMsg{Type: "hello", Client: c.id})
+	c.send <- hello
 	c.send <- cfg
 	c.send <- hist
 	c.send <- setlist
@@ -199,6 +202,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		delete(s.clients, c)
 		s.mu.Unlock()
 		s.ctl.FlashUp(c.id, nil, time.Now())
+		s.show.ExpireLive(c.id, time.Now()) // a prévia que ele levava aos canhões sai
 	}()
 
 	go func() {
@@ -252,6 +256,7 @@ type inMsg struct {
 	Temp     string          `json:"temp"`     // analyze: auto | quente | fria
 	Free     bool            `json:"free"`     // analyze: modo livre (efeitos criados para a música)
 	Mix      bool            `json:"mix"`      // analyze: modo misto (presets e efeitos combinados)
+	Playing  bool            `json:"playing"`  // live: a prévia está tocando
 }
 
 func (s *Server) handle(c *client, m *inMsg, now time.Time) error {
@@ -285,8 +290,9 @@ func (s *Server) handle(c *client, m *inMsg, now time.Time) error {
 		s.ctl.ToggleBlackout()
 	case "stopStrobe":
 		s.ctl.StopStrobe()
-	case "stopAll": // PARAR TUDO: luz manual, blackout e também a música
+	case "stopAll": // PARAR TUDO: luz manual, blackout, a música e a prévia nos canhões
 		s.ctl.StopAll()
+		s.show.StopLive("PARAR TUDO")
 		s.show.Stop()
 		s.sendPlayer(true)
 	case "manual":
@@ -300,6 +306,21 @@ func (s *Server) handle(c *client, m *inMsg, now time.Time) error {
 		return s.ctl.Swap(m.A, m.B)
 	case "identify":
 		return s.ctl.Identify(m.Pos, now)
+	case "live": // a prévia da aba Músicas nos canhões (Str = X.json)
+		if !m.Down {
+			if s.show.LiveStatus().Owner == c.id {
+				s.show.StopLive("")
+			}
+			return nil
+		}
+		if err := s.show.Live(c.id, m.Str, m.T, m.Playing, m.Arg == "sync"); err != nil {
+			msg, _ := json.Marshal(liveErrorMsg{Type: "liveError", File: m.Str, Error: err.Error()})
+			select {
+			case c.send <- msg:
+			default:
+			}
+			return err
+		}
 	default:
 		if handled, err := s.handleShow(m); handled {
 			return err
