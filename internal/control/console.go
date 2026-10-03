@@ -10,9 +10,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
-	"luzes/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/qlc"
 )
 
 // Teclas fixas dos atalhos da interface web (não podem ser usadas por botões).

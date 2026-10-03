@@ -15,7 +15,7 @@ import (
 
 	"gonum.org/v1/gonum/dsp/fourier"
 
-	"luzes/internal/audio"
+	"github.com/ncastellani/DMXController/internal/audio"
 )
 
 const (

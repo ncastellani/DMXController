@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"luzes/internal/analysis"
-	"luzes/internal/show"
-	"luzes/internal/sound"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/show"
+	"github.com/ncastellani/DMXController/internal/sound"
 )
 
 type setlistMsg struct {

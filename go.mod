@@ -1,4 +1,4 @@
-module luzes
+module github.com/ncastellani/DMXController
 
 go 1.26.4
 

@@ -11,8 +11,8 @@ import (
 	"math"
 	"slices"
 
-	"luzes/internal/audio"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // Mono converte uma faixa do player (16 bits, estéreo, 44,1 kHz) para mono

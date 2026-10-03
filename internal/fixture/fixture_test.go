@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 var mmT114 = &Profile{

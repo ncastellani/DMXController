@@ -1,4 +1,4 @@
-// Modo demonstração da interface do luzes (abrir com ?demo=1, ou numa cópia
+// Modo demonstração da interface do DMXController (abrir com ?demo=1, ou numa cópia
 // com <html data-demo>). Simula o servidor (PROTOCOLO.md) com dados
 // de exemplo, para desenhar e testar a interface sem o programa rodando.
 // Não faz parte do show: a página normal nunca carrega este arquivo.
@@ -65,7 +65,7 @@
     const [r, g, b] = rgb(c); return { color: hex(b, r, g), strobe: false };
   }
 
-  class LuzesDemoSocket {
+  class DemoSocket {
     constructor() {
       this.readyState = 0;
       const st = clone(D.state);
@@ -330,5 +330,5 @@
     }
   }
 
-  window.LuzesDemoSocket = LuzesDemoSocket;
+  window.DemoSocket = DemoSocket;
 })();

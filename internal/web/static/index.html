@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#1c1c24">
-<title>Luzes</title>
+<title>DMXController</title>
 <script>
 // Tema salvo neste aparelho (escuro por padrão: a tela fica ao lado do palco, no escuro).
-document.documentElement.dataset.theme = (() => { try { return localStorage.getItem("luzes-tema"); } catch { return null; } })() || "dark"; // escuro por padrão: a tela fica ao lado do palco, no escuro
+document.documentElement.dataset.theme = (() => { try { return localStorage.getItem("dmxcontroller-tema"); } catch { return null; } })() || "dark"; // escuro por padrão: a tela fica ao lado do palco, no escuro
 </script>
 <style>
 :root, [data-theme="light"] {
@@ -714,7 +714,7 @@ body.off main, body.off .master { opacity: .4; pointer-events: none; }
 </main>
 
 </div>
-<div id="offline">Sem conexão com o luzes — reconectando…<br><small>Confira se o programa está rodando no computador e se este aparelho está na mesma rede.</small></div>
+<div id="offline">Sem conexão com o DMXController — reconectando…<br><small>Confira se o programa está rodando no computador e se este aparelho está na mesma rede.</small></div>
 
 <script>
 "use strict";
@@ -747,14 +747,14 @@ if (DEMO) {
 }
 
 function connect() {
-  if (DEMO && !window.LuzesDemoSocket) {
+  if (DEMO && !window.DemoSocket) {
     const sc = document.createElement("script");
     sc.src = "demo.js"; sc.onload = connect;
     document.head.append(sc);
     return;
   }
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = DEMO ? new window.LuzesDemoSocket() : new WebSocket(`${proto}://${location.host}/ws`);
+  ws = DEMO ? new window.DemoSocket() : new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen = () => {
     retry = 500; document.body.classList.remove("off"); $("#offline").hidden = true;
     if (ed.file && !ed.saved) edSave(); // edição feita sem conexão
@@ -1702,8 +1702,8 @@ const FLASH_HZ = 2.9;
 const pref = (k, def) => { try { return localStorage.getItem(k) ?? def; } catch { return def; } };
 const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const pvOpt = {
-  view: pref("luzes-palco", "trelica"),
-  flash: pref("luzes-piscar", matchMedia("(prefers-reduced-motion: reduce)").matches ? "0" : "1") === "1",
+  view: pref("dmxcontroller-palco", "trelica"),
+  flash: pref("dmxcontroller-piscar", matchMedia("(prefers-reduced-motion: reduce)").matches ? "0" : "1") === "1",
 };
 const fxBadge = (x, y) => `<g class="fx" transform="translate(${x} ${y})" hidden><title></title><circle r="11"/><path d="${BOLT_PATH}" transform="translate(-7.2 -7.2) scale(.6)"/><text y="1">≋</text></g>`;
 // Gradientes de cada canhão: facho (do canhão para longe) e poça/brilho.
@@ -1802,10 +1802,10 @@ function paintStage(i, off) {
 }
 $("#pvView").addEventListener("click", (e) => {
   const b = e.target.closest("[data-view]"); if (!b) return;
-  pvOpt.view = b.dataset.view; setPref("luzes-palco", pvOpt.view);
+  pvOpt.view = b.dataset.view; setPref("dmxcontroller-palco", pvOpt.view);
   buildStage(); pvTick(true);
 });
-$("#pvFlash").onchange = (e) => { pvOpt.flash = e.target.checked; setPref("luzes-piscar", pvOpt.flash ? "1" : "0"); pvTick(true); };
+$("#pvFlash").onchange = (e) => { pvOpt.flash = e.target.checked; setPref("dmxcontroller-piscar", pvOpt.flash ? "1" : "0"); pvTick(true); };
 
 // ---------- faixa de cores: uma trilha por canhão sob a barra da música ----------
 let hatch = null;
@@ -2133,7 +2133,7 @@ showTab(location.hash.slice(1));
 
 function setTheme(t) {
   document.documentElement.dataset.theme = t;
-  try { localStorage.setItem("luzes-tema", t); } catch {}
+  try { localStorage.setItem("dmxcontroller-tema", t); } catch {}
   for (const b of $("#themeSw").children) b.classList.toggle("sel", b.dataset.set === t);
   document.querySelector('meta[name="theme-color"]').content = t === "dark" ? "#0d0d0f" : "#f6f5f2";
   if (timeline) { renderTimeline(); tick(); }

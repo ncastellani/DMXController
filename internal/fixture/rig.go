@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 // Rig liga as posições do palco (ordem do patch: esquerda → direita) aos

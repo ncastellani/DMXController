@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
 )
 
 // IdentifyTime é quanto tempo um canhão fica aceso ao ser identificado.

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"luzes/internal/audio"
-	"luzes/internal/control"
-	"luzes/internal/fixture"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 func TestTempoAndBeatsOfClickTrack(t *testing.T) {

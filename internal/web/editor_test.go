@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // addSong grava uma música mínima (timeline + WAV vazio) na pasta.

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"luzes/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/fixture"
 )
 
 func TestPreview(t *testing.T) {

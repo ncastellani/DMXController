@@ -4,8 +4,8 @@ import (
 	"math"
 	"time"
 
-	"luzes/internal/dmx"
-	"luzes/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/fixture"
 )
 
 // Prévia da luz de uma música sem tocar no DMX: o Program é desenhado num

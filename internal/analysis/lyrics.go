@@ -7,7 +7,7 @@ import (
 	"math"
 	"strings"
 
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // sung é a letra transcrita da versão cantada: as frases com tempo e as

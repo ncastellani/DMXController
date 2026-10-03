@@ -1,4 +1,4 @@
-# luzes — luz automática para show com DMX
+# DMXController — luz automática para show com DMX
 
 Programa em Go que comanda 3 canhões LED por DMX no show de um cantor (voz ao
 vivo sobre playback). Ele toca as faixas, gera uma **timeline de luz** para
@@ -70,7 +70,7 @@ Só um programa por vez pode usar a interface DMX: feche o QLC+ antes.
 Precisa do Go 1.26 ou mais novo.
 
 ```bash
-go build -o bin/ .                         # gera bin/luzes
+go build -o bin/ .                         # gera bin/DMXController
 cp .env.example .env                       # opcional: chave do OpenRouter para a IA
 ```
 
@@ -98,8 +98,8 @@ sistema bloquear o binário, rode `xattr -d com.apple.quarantine bin/darwin-arm6
 ## Uso
 
 ```bash
-./bin/luzes                 # abre a interface em http://<ip>:8080 (o terminal mostra os endereços)
-./bin/luzes -dev mock       # sem interface DMX: só a prévia na tela
+./bin/DMXController                 # abre a interface em http://<ip>:8080 (o terminal mostra os endereços)
+./bin/DMXController -dev mock       # sem interface DMX: só a prévia na tela
 ```
 
 | Opção | Padrão | Para quê |
@@ -112,7 +112,7 @@ sistema bloquear o binário, rode `xattr -d com.apple.quarantine bin/darwin-arm6
 | `-modelo` | `google/gemini-3.8-flash` | modelo do OpenRouter |
 | `-console`, `-profiles`, `-patch`, `-som` | `config/…` | arquivos de configuração |
 
-O `luzes` não tem interface no terminal: todo o controle e o log ficam na
+O `DMXController` não tem interface no terminal: todo o controle e o log ficam na
 página. Ctrl+C apaga os canhões e encerra.
 
 **Preparar o show**: na aba **Músicas**, envie os `.wav` (com a versão
@@ -126,7 +126,7 @@ Para analisar uma pasta inteira de uma vez (por exemplo, depois que o Amós
 criar presets novos):
 
 ```bash
-./bin/luzes analisar musicas/      # -sem-ia, -forcar (refaz as existentes), -temperatura quente|fria
+./bin/DMXController analisar musicas/      # -sem-ia, -forcar (refaz as existentes), -temperatura quente|fria
 ```
 
 Para usar a versão cantada pela linha de comando, deixe `X.voz.wav` ao lado
@@ -136,7 +136,7 @@ de `X.wav` (e, se quiser, a letra em `X.letra.txt`).
 
 | Caminho | O que é | No git? |
 |---|---|---|
-| `main.go`, `analisar.go` | o programa `luzes` (servidor) e o subcomando `luzes analisar` | sim |
+| `main.go`, `analisar.go` | o programa `DMXController` (servidor) e o subcomando `DMXController analisar` | sim |
 | `internal/` | código: `dmx`, `fixture`, `qlc`, `engine`, `control`, `show`, `audio`, `analysis`, `sound`, `web` | sim |
 | `config/console.yaml` | botões do console e limites de segurança | sim |
 | `config/fixtures.yaml`, `config/patch.yaml` | perfil dos canhões e endereços (o patch é regravado ao trocar posições) | sim |

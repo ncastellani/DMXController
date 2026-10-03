@@ -3,8 +3,8 @@ package web
 import (
 	"fmt"
 
-	"luzes/internal/control"
-	"luzes/internal/engine"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/engine"
 )
 
 type configMsg struct {

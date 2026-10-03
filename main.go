@@ -1,9 +1,9 @@
-// luzes é o servidor do show: toca os modos de pista, cores e strobos do
+// DMXController é o servidor do show: toca os modos de pista, cores e strobos do
 // workspace do QLC+ e serve a interface web (iPad/computador), com prévia
 // dos canhões em tempo real. Todo o controle é feito pela interface.
 //
-//	luzes [opções]                 servidor do show (interface web)
-//	luzes analisar [opções] <...>  gera as timelines de uma pasta (ver analisar.go)
+//	DMXController [opções]                 servidor do show (interface web)
+//	DMXController analisar [opções] <...>  gera as timelines de uma pasta (ver analisar.go)
 package main
 
 import (
@@ -22,15 +22,15 @@ import (
 	"syscall"
 	"time"
 
-	"luzes/internal/analysis"
-	"luzes/internal/audio"
-	"luzes/internal/control"
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
-	"luzes/internal/show"
-	"luzes/internal/sound"
-	"luzes/internal/web"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/show"
+	"github.com/ncastellani/DMXController/internal/sound"
+	"github.com/ncastellani/DMXController/internal/web"
 )
 
 func main() {
@@ -52,7 +52,7 @@ func run() error {
 	patch := flag.String("patch", "config/patch.yaml", "posições e endereços dos canhões")
 	addr := flag.String("web", ":8080", "endereço da interface web")
 	token := flag.String("token", "", "se definido, a interface web exige ?t=<token> no primeiro acesso")
-	songsDir := flag.String("musicas", "musicas", "pasta da setlist (X.wav + X.json gerado pela aba Músicas ou por luzes analisar)")
+	songsDir := flag.String("musicas", "musicas", "pasta da setlist (X.wav + X.json gerado pela aba Músicas ou por DMXController analisar)")
 	// Um arquivo por sistema: ids de saída e endereços Bluetooth mudam de formato.
 	showDMX := flag.Bool("ver-dmx", false, "mostra no terminal os canais DMX enviados (quando mudam, até 10 linhas/s)")
 	model := flag.String("modelo", analysis.DefaultModel, "modelo do OpenRouter para analisar músicas novas")
@@ -77,7 +77,7 @@ func run() error {
 
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		return fmt.Errorf("interface web: %w (o luzes já está aberto em outro terminal?)", err)
+		return fmt.Errorf("interface web: %w (o DMXController já está aberto em outro terminal?)", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -87,7 +87,7 @@ func run() error {
 	ctl := control.NewController(console, eng, rig)
 	health := &web.Health{}
 	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
-		const msg = "o luzes está rodando como root (sudo): o som não passa pelo PipeWire do seu usuário e ignora a saída escolhida (sai no HDMI/placa padrão). Rode sem sudo — veja a regra udev no CLAUDE.md."
+		const msg = "o DMXController está rodando como root (sudo): o som não passa pelo PipeWire do seu usuário e ignora a saída escolhida (sai no HDMI/placa padrão). Rode sem sudo — veja a regra udev no CLAUDE.md."
 		log.Print("ATENÇÃO: " + msg)
 		health.Warn(msg)
 	}

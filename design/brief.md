@@ -1,4 +1,4 @@
-# Briefing — redesenho da interface do "luzes"
+# Briefing — redesenho da interface do DMXController
 
 ## O que é
 
@@ -9,7 +9,7 @@ computador ao mesmo tempo**, ao lado do palco, **no escuro**, durante o show
 ao vivo.
 
 A página atual funciona bem; o objetivo é deixá-la **mais bonita, mais clara e
-mais rápida de operar sob pressão**. Arquivo: `luzes-demo.html` (abre sozinho,
+mais rápida de operar sob pressão**. Arquivo: `dmxcontroller-demo.html` (abre sozinho,
 com dados de exemplo — selo roxo "MODO DEMONSTRAÇÃO" no canto). Prints de
 todas as abas em computador, iPad e celular estão em `prints/`.
 
@@ -136,8 +136,8 @@ animações suaves (que não pisquem).
 
 ## Como entregar
 
-Edite o próprio `luzes-demo.html` mantendo o modo demonstração funcionando
-(o bloco de script `LuzesDemoSocket` e a lógica que reage às mensagens). Pode
+Edite o próprio `dmxcontroller-demo.html` mantendo o modo demonstração funcionando
+(o bloco de script `DemoSocket` e a lógica que reage às mensagens). Pode
 mudar HTML e CSS à vontade; ao mexer no JavaScript, preserve o que cada botão
 envia. No fim, liste o que mudou de estrutura (ids, abas novas/removidas).
 
@@ -145,7 +145,7 @@ envia. No fim, liste o que mudou de estrutura (ids, abas novas/removidas).
 
 ## Mensagem para colar no Claude Design
 
-> Anexei `luzes-demo.html` (interface de um console de iluminação de show, já
+> Anexei `dmxcontroller-demo.html` (interface de um console de iluminação de show, já
 > em modo demonstração com dados de exemplo), os prints de todas as abas e
 > este briefing (`brief.md`). Quero redesenhar a interface seguindo o
 > briefing: mais bonita, clara e rápida de operar no escuro, principalmente

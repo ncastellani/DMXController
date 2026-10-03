@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"luzes/internal/audio"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // Options configura a geração de uma timeline.

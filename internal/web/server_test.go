@@ -13,11 +13,11 @@ import (
 
 	"github.com/coder/websocket"
 
-	"luzes/internal/control"
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // newServer monta o show real (console.yaml + workspace do QLC+) com um

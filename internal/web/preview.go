@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"luzes/internal/analysis"
-	"luzes/internal/fixture"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // Prévia e edição de qualquer música da setlist pela aba Músicas, sem

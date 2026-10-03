@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
 )
 
 // Value é o valor de um canal DMX absoluto (1..512).

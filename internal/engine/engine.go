@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 // Source gera valores DMX em função do tempo desde que começou a tocar.

@@ -1,4 +1,4 @@
-# Projeto: Luzes automáticas para show (Go + DMX)
+# Projeto: DMXController — luzes automáticas para show (Go + DMX)
 
 > Responda sempre em **português do Brasil**. **Onde paramos e o que vem a seguir: `HANDOFF.md`** (leia primeiro). Visão de uso, instalação e mapa de arquivos: `README.md`.
 
@@ -7,16 +7,16 @@ Programa em Go que controla 3 canhões LED via DMX no pequeno show de um cantor 
 ## Comandos
 
 ```bash
-go build -o bin/ .                            # bin/luzes (um binário só; package main na raiz)
+go build -o bin/ .                            # bin/DMXController (um binário só; package main na raiz)
 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .   # Raspberry Pi
 for a in arm64 amd64; do GOOS=darwin GOARCH=$a CGO_ENABLED=0 go build -o bin/darwin-$a/ .; done
 go test -race ./...
-./bin/luzes                     # servidor web :8080 (DMX auto, -dev mock, -ver-dmx, -token, -musicas, -modelo)
-./bin/luzes analisar musicas/   # gera X.json para cada X.wav (-sem-ia, -forcar, -temperatura quente|fria; usa X.voz.wav e X.letra.txt)
+./bin/DMXController                     # servidor web :8080 (DMX auto, -dev mock, -ver-dmx, -token, -musicas, -modelo)
+./bin/DMXController analisar musicas/   # gera X.json para cada X.wav (-sem-ia, -forcar, -temperatura quente|fria; usa X.voz.wav e X.letra.txt)
 python3 scripts/kit_design.py   # kit para o Claude Design (design/) — só quando a usuária pedir
 ```
 
-O `luzes` **não tem interface no terminal** (só imprime os endereços); todo controle e log ficam na web.
+O `DMXController` **não tem interface no terminal** (só imprime os endereços); todo controle e log ficam na web.
 
 ## Hardware
 
@@ -50,4 +50,4 @@ Locks: o engine chama `source.Render` segurando o lock dele → `Show` nunca cha
 - Design: o Claude Design **não está mais em uso** (desde 02/10/2026). Não rodar `scripts/kit_design.py` nem atualizar o kit (`design/`) sem pedido. Se voltar: ele desenha (kit em `design/`: `brief.md` à mão + `luzes-demo.html`/prints gerados) e Claude Code integra mantendo protocolo, lógica de flash, reconexão, alertas, sincronização da lista e modo demonstração.
 - Configuração em YAML/arquivos, nada de endereços hardcoded; sempre manter o modo mock funcionando; `gofmt` + testes.
 - Git: `musicas/`, `tmp/`, `.env`, `bin/`, `config/som-*.yaml` e o kit gerado do Claude Design ficam fora (ver `.gitignore`). Sobras e testes locais vão para `tmp/`.
-- Testes de interface reais: Chrome headless do cache do Playwright + `scripts/cdp.mjs`. **Nunca `pkill -f` com padrão que apareça no próprio comando** (mata o shell); use `pkill -x luzes` / `pkill -x chrome-headless`.
+- Testes de interface reais: Chrome headless do cache do Playwright + `scripts/cdp.mjs`. **Nunca `pkill -f` com padrão que apareça no próprio comando** (mata o shell); use `pkill -x DMXController` / `pkill -x chrome-headless`.

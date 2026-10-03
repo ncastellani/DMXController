@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"luzes/internal/audio"
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
 )
 
 // Song é uma música da setlist (um par X.json + X.wav na pasta).

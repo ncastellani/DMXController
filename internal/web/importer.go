@@ -13,7 +13,7 @@ import (
 	"strings"
 	"unicode"
 
-	"luzes/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/analysis"
 )
 
 // Importer recebe faixas .wav pela interface e gera a timeline de cada uma.

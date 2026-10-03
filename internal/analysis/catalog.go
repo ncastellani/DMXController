@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"luzes/internal/control"
-	"luzes/internal/dmx"
-	"luzes/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/fixture"
 )
 
 // Preset descreve um botão do console para as escolhas do coreógrafo.

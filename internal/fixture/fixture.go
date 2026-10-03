@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 // Role é a função de um canal dentro do perfil.

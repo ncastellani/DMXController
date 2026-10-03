@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 // fill escreve um valor fixo no canal 1.

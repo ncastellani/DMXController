@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"luzes/internal/audio"
+	"github.com/ncastellani/DMXController/internal/audio"
 )
 
 // track monta uma faixa do player a partir de um sinal mono a 44,1 kHz.

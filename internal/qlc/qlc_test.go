@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"luzes/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/dmx"
 )
 
 const sample = `<?xml version="1.0" encoding="UTF-8"?>

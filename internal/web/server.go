@@ -16,11 +16,11 @@ import (
 
 	"github.com/coder/websocket"
 
-	"luzes/internal/audio"
-	"luzes/internal/control"
-	"luzes/internal/engine"
-	"luzes/internal/show"
-	"luzes/internal/sound"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/show"
+	"github.com/ncastellani/DMXController/internal/sound"
 )
 
 //go:embed static
@@ -93,11 +93,11 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("t") == s.token {
-			http.SetCookie(w, &http.Cookie{Name: "luzes", Value: s.token, Path: "/", MaxAge: 30 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteStrictMode})
+			http.SetCookie(w, &http.Cookie{Name: "dmxcontroller", Value: s.token, Path: "/", MaxAge: 30 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 			next.ServeHTTP(w, r)
 			return
 		}
-		if c, err := r.Cookie("luzes"); err == nil && c.Value == s.token {
+		if c, err := r.Cookie("dmxcontroller"); err == nil && c.Value == s.token {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -13,7 +13,7 @@ Tudo do README está pronto e testado no Linux. A 5ª sessão fez a **Sessão A
   (opcional)": um segundo `.wav`, a mesma faixa com a voz, gravado como
   `X.voz.wav` (`POST /api/upload?name=X.wav&voz=1`; "Trocar"/"Tirar" ao
   analisar de novo, `analyze` com `noVoice`). O show nunca toca esse arquivo;
-  ele não aparece como música nova. `luzes analisar` usa `X.voz.wav` sozinho.
+  ele não aparece como música nova. `DMXController analisar` usa `X.voz.wav` sozinho.
 - **Isolar a voz** (`analysis/vocals.go`): GCC-PHAT alinha as versões (até
   ±5 s; outra música dá placar < 10, a mesma faixa > 100 → limiar 30, senão
   a cantada é ignorada com aviso); subtração espectral por banda (ganho do

@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"luzes/internal/dmx"
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
-	"luzes/internal/qlc"
+	"github.com/ncastellani/DMXController/internal/dmx"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/qlc"
 )
 
 // Timeline é o conteúdo de musicas/<faixa>.json.

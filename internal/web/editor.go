@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"luzes/internal/analysis"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // songPath devolve o JSON da música file ("X.json", como na setlist); vazio

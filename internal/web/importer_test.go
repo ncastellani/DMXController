@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"luzes/internal/analysis"
-	"luzes/internal/audio"
-	"luzes/internal/control"
-	"luzes/internal/engine"
-	"luzes/internal/fixture"
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/audio"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/engine"
+	"github.com/ncastellani/DMXController/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // waitJob espera a n-ésima análise da fila terminar.

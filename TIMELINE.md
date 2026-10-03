@@ -1,7 +1,7 @@
 # Formato da timeline (`musicas/<faixa>.json`)
 
-Gerado ao lado de cada `.wav` pelo próprio `luzes` (ao enviar a música pela
-interface) ou por `luzes analisar <pasta>`; depois editado pela interface web
+Gerado ao lado de cada `.wav` pelo próprio `DMXController` (ao enviar a música pela
+interface) ou por `DMXController analisar <pasta>`; depois editado pela interface web
 (aba Músicas, com a prévia dos canhões).
 Tempos sempre em **segundos desde o início do áudio**.
 
@@ -12,7 +12,7 @@ Tempos sempre em **segundos desde o início do áudio**.
   // temperature: cores pedidas (auto | quente | fria); lyrics: a IA usou a letra colada (X.letra.txt).
   // voice: veio da versão cantada (X.voz.wav): shift = atraso dela em relação ao playback (s),
   // clean = a subtração deixou a voz limpa, phrases = frases cantadas encontradas.
-  "generated": { "at": "2026-10-02T18:14:19Z", "by": "luzes", "model": "google/gemini-3.8-flash", "temperature": "fria",
+  "generated": { "at": "2026-10-02T18:14:19Z", "by": "DMXController", "model": "google/gemini-3.8-flash", "temperature": "fria",
                  "voice": { "shift": 0, "clean": true, "phrases": 38 } },
 
   // Como a luz deve "se comportar" nesta música. mode: presets | freestyle | misto
@@ -114,6 +114,6 @@ LIMÃO) também valem como `qlc:<ID>`: a análise e o editor as oferecem como
   máximo 4 batidas, com pelo menos 20 s entre acentos.
 - Presets acionados à mão durante a música ficam **por cima** da timeline e,
   ao serem desligados, a timeline volta.
-- `luzes analisar` **não sobrescreve** um JSON existente (pode ter edições); use
+- `DMXController analisar` **não sobrescreve** um JSON existente (pode ter edições); use
   `-forcar` para refazer (`-temperatura quente|fria`; usa `X.voz.wav` e
   `X.letra.txt` se existirem). Na interface, "Analisar de novo" substitui depois de confirmar.

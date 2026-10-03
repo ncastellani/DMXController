@@ -4,8 +4,8 @@
 Uso:  python3 scripts/kit_design.py
 
 Gera em design/:
-  luzes-demo.html   a interface atual num arquivo único, já em modo
-                    demonstração (dados de exemplo, sem precisar do luzes)
+  dmxcontroller-demo.html   a interface atual num arquivo único, já em modo
+                    demonstração (dados de exemplo, sem precisar do DMXController)
   prints/*.png      todas as abas em computador, iPad e celular
 O briefing (design/brief.md) é escrito à mão; este script não mexe nele.
 """
@@ -25,7 +25,7 @@ TABS = ["show", "console", "musicas", "manual", "palco", "som", "log"]
 # Prints extras (o editor parado no "verde-limão" da versão cantada; sem as
 # transições de cor do palco, que não andam no tempo virtual do print): aba,
 # script rodado numa cópia temporária da página (o
-# luzes-demo.html entregue não muda) e tamanhos (no celular o editor fica
+# dmxcontroller-demo.html entregue não muda) e tamanhos (no celular o editor fica
 # abaixo da lista, fora do print).
 EXTRAS = {
     "musicas-editor": ("musicas", 'document.head.insertAdjacentHTML("beforeend", "<style>*{transition:none!important}</style>");'
@@ -44,7 +44,7 @@ def build_demo():
     # demo.js entra antes do script principal, já carregado.
     i = page.index("<script>")
     page = page[:i] + "<script>\n" + demo + "\n</script>\n" + page[i:]
-    out = OUT / "luzes-demo.html"
+    out = OUT / "dmxcontroller-demo.html"
     out.write_text(page)
     return out
 

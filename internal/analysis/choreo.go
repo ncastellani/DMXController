@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // Tetos de segurança para os acentos gerados (alinhados com limits do console).
@@ -491,7 +491,7 @@ func build(title, file string, a show.Analysis, cat []Preset, secs []sectionChoi
 		}{llm.Genre, llm.Mood, llm.Desc, llm.BPM}
 	}
 	t.Personality, _ = json.Marshal(map[string]any{"mode": "presets", "intensity": round(intensity, 2), "palette": palette})
-	gen := map[string]any{"at": time.Now().UTC().Format(time.RFC3339), "by": "luzes", "temperature": opt.temp()}
+	gen := map[string]any{"at": time.Now().UTC().Format(time.RFC3339), "by": "DMXController", "temperature": opt.temp()}
 	if model != "" {
 		gen["model"] = model
 	}

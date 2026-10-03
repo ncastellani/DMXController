@@ -1,12 +1,12 @@
 package main
 
-// "luzes analisar" gera a timeline de luz (X.json) de cada faixa X.wav: BPM,
+// "DMXController analisar" gera a timeline de luz (X.json) de cada faixa X.wav: BPM,
 // batidas, partes e escolha de presets, com IA opcional (OpenRouter).
 // A aba Músicas faz o mesmo, uma música por vez; este subcomando é para
 // processar uma pasta inteira de uma vez.
 //
-//	luzes analisar musicas/            todas as .wav da pasta
-//	luzes analisar musicas/x.wav       uma faixa
+//	DMXController analisar musicas/            todas as .wav da pasta
+//	DMXController analisar musicas/x.wav       uma faixa
 //
 // Um JSON existente não é sobrescrito (pode ter edições), a não ser com -forcar.
 // Se existir X.voz.wav (a versão cantada) ao lado de X.wav, a IA transcreve a
@@ -22,9 +22,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"luzes/internal/analysis"
-	"luzes/internal/control"
-	"luzes/internal/fixture"
+	"github.com/ncastellani/DMXController/internal/analysis"
+	"github.com/ncastellani/DMXController/internal/control"
+	"github.com/ncastellani/DMXController/internal/fixture"
 )
 
 func analisar(args []string) error {
@@ -38,7 +38,7 @@ func analisar(args []string) error {
 	temp := flag.String("temperatura", analysis.TempAuto, "cores: auto | quente | fria")
 	flag.Parse(args)
 	if flag.NArg() == 0 {
-		fmt.Fprintln(os.Stderr, "uso: luzes analisar [opções] <pasta ou arquivo.wav>...")
+		fmt.Fprintln(os.Stderr, "uso: DMXController analisar [opções] <pasta ou arquivo.wav>...")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}

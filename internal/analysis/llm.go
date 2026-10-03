@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"luzes/internal/show"
+	"github.com/ncastellani/DMXController/internal/show"
 )
 
 // DefaultModel é o modelo do OpenRouter usado por padrão (aceita áudio).
@@ -229,7 +229,7 @@ func chat(ctx context.Context, p prompt, temperature float64, content []any) (an
 	}
 	req.Header.Set("Authorization", "Bearer "+p.key)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Title", "luzes")
+	req.Header.Set("X-Title", "DMXController")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", "", err

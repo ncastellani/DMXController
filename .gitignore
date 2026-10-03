@@ -12,8 +12,8 @@ tmp/
 config/som-*.yaml
 
 # Kit do Claude Design: gerado por scripts/kit_design.py (o brief.md fica)
-design/luzes-demo.html
+design/dmxcontroller-demo.html
 design/prints/
 
 # go build sem -o gera o binário na raiz
-/luzes
+/DMXController

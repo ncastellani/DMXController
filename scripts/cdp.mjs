@@ -1,11 +1,11 @@
 // Teste de interface num navegador de verdade (Chrome headless + CDP).
 //
-// 1. Suba o luzes:   ./bin/luzes -dev mock -web :8099 -musicas <pasta de teste> -som /tmp/som.yaml
+// 1. Suba o programa: ./bin/DMXController -dev mock -web :8099 -musicas <pasta de teste> -som /tmp/som.yaml
 // 2. Suba o Chrome:  ~/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell \
 //                      --no-sandbox --remote-debugging-port=9333 --window-size=1180,820 about:blank &
 // 3. Rode:           node scripts/cdp.mjs http://localhost:8099/ /tmp/print.png
 //    (edite o bloco "roteiro" abaixo com os passos do teste)
-// 4. Encerre:        pkill -x chrome-headless ; pkill -x luzes
+// 4. Encerre:        pkill -x chrome-headless ; pkill -x DMXController
 //    NUNCA use `pkill -f` com um padrão que apareça no próprio comando: mata o shell.
 //
 // ev(js) avalia JavaScript na página (tem acesso a send(), timeline, player...).
