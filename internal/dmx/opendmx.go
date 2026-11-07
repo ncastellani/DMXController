@@ -9,18 +9,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Tempos do quadro. Os drivers FTDI ligam/desligam o break por mensagens USB,
-// então os valores reais ficam na casa de ~1 ms (bem acima do mínimo e
-// dentro da norma).
-const (
-	breakTime = 120 * time.Microsecond
-	mabTime   = 12 * time.Microsecond
-)
-
 // OpenDMX fala com interfaces compatíveis com Enttec Open DMX (FTDI sem
 // microcontrolador, ex.: SourLight SL1000) pelo driver serial do sistema.
 // A parte específica de cada sistema (baud de 250000, break, drain) está em
-// opendmx_linux.go e opendmx_darwin.go.
+// opendmx_linux.go e opendmx_darwin.go; o Windows tem a sua versão inteira
+// em opendmx_windows.go.
 type OpenDMX struct {
 	fd  int
 	buf [1 + Universe]byte // start code + dados

@@ -15,7 +15,8 @@ Feito em Go para o pequeno show de um cantor (voz ao vivo sobre playback, 3
 canhões LED RGB). É um binário só e **não tem interface no terminal**: ele
 imprime os endereços da página, e todo o controle e o log ficam nela. Foi
 desenvolvido e testado no Linux (Ubuntu); no show vai rodar num **Raspberry
-Pi 5**.
+Pi 5**. Também roda no **Windows** e no **Mac** (ainda não testados com o
+equipamento).
 
 **Experimente sem instalar nada**: a [demonstração online](https://ncastellani.github.io/DMXController/)
 é a mesma interface com dados de exemplo (sem som e sem DMX).
@@ -29,7 +30,8 @@ Pi 5**.
 > **In English:** DMXController is a Go program that plays a show's backing
 > tracks, analyses each song (beats, sections, drums; optionally with an LLM via
 > OpenRouter) to generate a light timeline, and drives DMX LED fixtures in sync
-> through an Enttec Open DMX-compatible USB interface. A web UI (tablet and
+> through an Enttec Open DMX-compatible USB interface, on Linux, Windows and
+> macOS. A web UI (tablet and
 > desktop) offers a live preset console, a 2D preview and a timeline editor.
 > Code, UI and docs are in Brazilian Portuguese. Try the
 > [online demo](https://ncastellani.github.io/DMXController/).
@@ -150,7 +152,7 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
 
 | Peça | O que serve | Usado no desenvolvimento |
 |---|---|---|
-| Computador | Linux (PC ou Raspberry Pi de 64 bits) ou macOS (**não testado**). Windows não é suportado | Ubuntu; no show, Raspberry Pi 5 de 4 GB |
+| Computador | Linux (PC ou Raspberry Pi de 64 bits), Windows 10 ou 11 ou macOS (Windows e Mac **não testados** com o equipamento) | Ubuntu; no show, Raspberry Pi 5 de 4 GB |
 | Interface DMX | USB do tipo **Enttec Open DMX**: chip FTDI, sem microcontrolador | SourLight SL1000 (FTDI FT232R `0403:6001`) |
 | Canhões | aparelhos LED RGB com DMX. O programa foi pensado para **3** (esquerda, centro, direita) | 3× Mini Men MM-T114 em modo 7 canais, endereços **d001, d008, d015** |
 | Som | qualquer saída do sistema: cabo, Bluetooth, HDMI, placa USB | caixa Mondial CM-400 por Bluetooth ou cabo P2 |
@@ -170,7 +172,11 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
   aparelhos, veja [Adaptar a outros canhões](#adaptar-a-outros-canhões).
 - **Linux**: `termios2`/BOTHER + `TIOCSBRK`; os ioctls repetem em `EINTR`.
   **macOS**: `IOSSIOSPEED` + `TIOCDRAIN`, porta `/dev/cu.usbserial-*` (**não
-  testado**). `-dev auto` detecta a porta nos dois.
+  testado**). **Windows**: a porta COM do driver VCP da FTDI (o Windows o
+  instala sozinho), `SetCommState` a 250000 baud, break por
+  `EscapeCommFunction` e espera da transmissão por `ClearCommError` (**não
+  testado**). `-dev auto` detecta a porta nos três (no Windows, pelas portas
+  `\Device\VCPn` do registro).
 - **Não rodar com `sudo`**: o som iria para o HDMI e os arquivos ficariam do
   root. A permissão da porta no Linux vem de uma regra udev (ver
   [Instalação](#instalação)).
@@ -190,12 +196,17 @@ baixe o pacote da sua plataforma:
 | Raspberry Pi (sistema de 64 bits) | `DMXController-<versão>-linux-arm64.tar.gz` |
 | Mac com Apple Silicon (M1, M2…) | `DMXController-<versão>-darwin-arm64.tar.gz` |
 | Mac com Intel | `DMXController-<versão>-darwin-amd64.tar.gz` |
+| PC com Windows 10 ou 11 | `DMXController-<versão>-windows-amd64.zip` |
+| Windows em processador ARM (Surface Pro X, Copilot+ PC…) | `DMXController-<versão>-windows-arm64.zip` |
 
 ```bash
 tar -xzf DMXController-v1.0.0-linux-arm64.tar.gz
 cd DMXController
 ./DMXController -dev mock          # primeiro teste, sem interface DMX
 ```
+
+No Windows, extraia o `.zip` (botão direito → Extrair tudo) e veja
+[Windows](#windows-ainda-não-testado).
 
 O pacote traz o binário, a configuração (`config/`), o `.env.example`, o
 script do ouvido de bateria, este README e a licença. O `SHA256SUMS` da
@@ -216,12 +227,14 @@ Outras plataformas (compila sem cgo):
 ```bash
 GOOS=linux  GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .    # Raspberry Pi (64 bits)
 GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o bin/darwin-arm64/ .   # Mac M1/M2
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o bin/windows-amd64/ . # Windows (gera DMXController.exe)
 ```
 
 Nos exemplos deste manual, `./DMXController` é o binário: no pacote pronto
-ele fica na raiz; se você compilou, é `./bin/DMXController`. Rode sempre **de
-dentro da pasta do programa**: os caminhos padrão (`config/`, `musicas/`,
-`.env`, `.ouvido/`) são relativos à pasta atual.
+ele fica na raiz; se você compilou, é `./bin/DMXController`. No Windows, é
+`.\DMXController.exe`. Rode sempre **de dentro da pasta do programa**: os
+caminhos padrão (`config/`, `musicas/`, `.env`, `.ouvido/`) são relativos à
+pasta atual (no Windows, abrir o `.exe` com dois cliques já faz isso).
 
 ### Linux: permissão da porta
 
@@ -248,6 +261,37 @@ brew install blueutil switchaudio-osx
 Se o sistema bloquear o binário, rode `xattr -d com.apple.quarantine DMXController`
 (ou `bin/darwin-arm64/*`, se compilou).
 
+### Windows (ainda não testado)
+
+1. **Extraia o `.zip` numa pasta de caminho curto**, como `C:\DMXController`
+   (o ouvido de bateria tem arquivos com caminhos longos).
+2. **Abra o `DMXController.exe`** com dois cliques, ou num terminal
+   (PowerShell) dentro da pasta, para passar opções:
+
+   ```powershell
+   .\DMXController.exe -dev mock
+   ```
+
+   Na primeira vez, o Windows pode mostrar "O Windows protegeu o
+   computador" (o programa não é assinado): clique em **Mais informações →
+   Executar assim mesmo**.
+3. **Permita o acesso à rede** quando o Firewall do Windows perguntar,
+   marcando **Redes privadas**: é o que deixa o iPad abrir a página. A rede
+   Wi-Fi precisa estar como "Rede privada" nas Configurações do Windows.
+4. **Interface DMX**: o Windows instala sozinho o driver da FTDI na primeira
+   vez que ela é ligada. Ela aparece no Gerenciador de Dispositivos, em
+   "Portas (COM e LPT)", como "USB Serial Port (COM3)" (o número muda). Se
+   não aparecer, instale o driver VCP do site da FTDI. Não precisa de
+   permissão especial nem de administrador.
+5. **Som**: a saída e a caixa Bluetooth se escolhem nas Configurações do
+   Windows (Sistema → Som; Bluetooth e dispositivos). O programa toca na
+   saída padrão e acompanha quando ela muda; atraso e volume ficam na
+   página.
+
+Para encerrar, aperte Ctrl+C na janela do programa (ele apaga os canhões
+antes de sair). Se o programa fechar com erro depois de aberto com dois
+cliques, a janela espera um Enter, para dar tempo de ler a mensagem.
+
 ### IA (opcional)
 
 A análise com IA usa o [OpenRouter](https://openrouter.ai). Crie uma chave
@@ -257,7 +301,8 @@ lá e coloque no `.env`:
 cp .env.example .env                       # e preencha OPENROUTER_API_KEY
 ```
 
-A variável de ambiente `OPENROUTER_API_KEY` também vale. Sem a chave, a
+No Windows: `copy .env.example .env` e edite o `.env` no Bloco de Notas. A
+variável de ambiente `OPENROUTER_API_KEY` também vale. Sem a chave, a
 análise usa só regras, e o resto do programa funciona igual. Uma música
 custa cerca de US$ 0,02 a 0,03.
 
@@ -272,9 +317,17 @@ scripts/instalar_ouvido.sh      # ~1,2 GB em disco, precisa de internet só aqui
 rm -rf .ouvido                  # para desinstalar (nada fica fora da pasta)
 ```
 
+No Windows (PowerShell, dentro da pasta do programa):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\instalar_ouvido.ps1
+Remove-Item -Recurse -Force .ouvido   # para desinstalar
+```
+
 O script baixa o `uv`, um Python 3.12 próprio, o PyTorch só de CPU, o Demucs
 e o modelo `htdemucs` (80 MB). Funciona em Linux x86_64 e aarch64 (Raspberry
-Pi) e em macOS.
+Pi), em macOS e em Windows de 64 bits com Intel ou AMD (no Windows em ARM,
+não).
 
 Com ele, a análise de uma música leva de 40 s a 1 min a mais na primeira vez
 (num computador comum; num Raspberry Pi, alguns minutos) e usa cerca de 2 GB
@@ -288,7 +341,7 @@ Músicas diz se o ouvido está ligado.
 ### Primeiro contato, sem equipamento
 
 ```bash
-./DMXController -dev mock
+./DMXController -dev mock          # no Windows: .\DMXController.exe -dev mock
 ```
 
 O terminal mostra os endereços da interface (ex.: `http://localhost:8080` e
@@ -311,12 +364,14 @@ de sair.
    têm de bater com `config/patch.yaml`.
 2. **Ligue a interface USB** e o cabo DMX: interface → canhão → canhão. Um
    terminador no último ajuda em cabos longos.
-3. No Linux, faça a [regra udev](#linux-permissão-da-porta) (uma vez).
+3. No Linux, faça a [regra udev](#linux-permissão-da-porta) (uma vez). No
+   Windows, confira a porta COM no Gerenciador de Dispositivos (ver
+   [Windows](#windows-ainda-não-testado)).
 4. **Rode sem `-dev`**: `./DMXController`. Ele encontra a interface sozinho
-   (`-dev auto`). Se houver mais de uma porta serial, escolha com
-   `-dev /dev/ttyUSB0` (Linux) ou `-dev /dev/cu.usbserial-XXXX` (Mac). Sem a
-   interface, o programa continua funcionando, avisa na barra do topo e
-   tenta de novo a cada segundo.
+   (`-dev auto`). Se houver mais de uma interface, escolha com
+   `-dev /dev/ttyUSB0` (Linux), `-dev /dev/cu.usbserial-XXXX` (Mac) ou
+   `-dev COM3` (Windows). Sem a interface, o programa continua funcionando,
+   avisa na barra do topo e tenta de novo a cada segundo.
 5. Na aba **Posições**, use **Identificar** (acende um canhão por 3 s) para
    conferir quem é a esquerda, o centro e a direita. Se estiverem trocados,
    troque as posições ali mesmo: o programa grava em `config/patch.yaml`.
@@ -472,7 +527,10 @@ Na aba **Som**:
    luz). Fica salvo em `config/som-<sistema>.yaml`.
 
 No Mac, a troca de saída e o Bluetooth precisam do `blueutil` e do
-`switchaudio-osx` (a aba avisa se faltarem).
+`switchaudio-osx` (a aba avisa se faltarem). No Windows, a saída e a caixa
+ficam nas Configurações do Windows: a aba mostra só a saída padrão (o
+programa acompanha quando ela muda), e a calibração e o volume funcionam
+igual.
 
 ### Durante o show
 
@@ -528,6 +586,8 @@ Resumo do dia do show:
   fica num cookie). O terminal já mostra os endereços com o token.
 - `-web 127.0.0.1:8080` deixa a página só no próprio computador; `-web :9000`
   troca a porta.
+- No Windows, o Firewall pergunta na primeira vez se o programa pode usar a
+  rede: permita em **Redes privadas**, ou o iPad não abre a página.
 - O programa não precisa de internet durante o show. Uma opção é o próprio
   computador (ou o Raspberry Pi) criar uma rede Wi-Fi para o iPad, sem
   depender da rede do local.
@@ -541,7 +601,7 @@ Resumo do dia do show:
 
 | Opção | Padrão | Para quê |
 |---|---|---|
-| `-dev` | `auto` | porta serial da interface DMX, `auto` (detecta) ou `mock` (só a prévia) |
+| `-dev` | `auto` | porta serial da interface DMX (`/dev/ttyUSB0`, `COM3`…), `auto` (detecta) ou `mock` (só a prévia) |
 | `-web` | `:8080` | endereço da interface web |
 | `-musicas` | `musicas` | pasta da setlist |
 | `-token` | — | exige `?t=<token>` no primeiro acesso (depois fica num cookie) |
@@ -586,9 +646,14 @@ dele (é o que o modo livre usa para escolher):
 
 | O que acontece | O que fazer |
 |---|---|
-| "nenhuma interface DMX (FTDI) encontrada" | confira o cabo USB e, no Linux, a [regra udev](#linux-permissão-da-porta). Feche o QLC+ ou outro programa de luz. Para ensaiar sem interface, use `-dev mock` |
-| "mais de uma porta serial encontrada" | escolha a porta com `-dev /dev/ttyUSB0` (ou `/dev/serial/by-id/…`) |
-| "permission denied" na porta | falta a regra udev; não use `sudo` |
+| "nenhuma interface DMX (FTDI) encontrada" | confira o cabo USB e, no Linux, a [regra udev](#linux-permissão-da-porta); no Windows, se ela aparece em "Portas (COM e LPT)" no Gerenciador de Dispositivos (se não, instale o driver VCP da FTDI, ou passe a porta com `-dev COM3`). Feche o QLC+ ou outro programa de luz. Para ensaiar sem interface, use `-dev mock` |
+| "mais de uma porta serial encontrada" | escolha a porta com `-dev /dev/ttyUSB0` (ou `/dev/serial/by-id/…`; no Windows, `-dev COM3`) |
+| "permission denied" na porta (Linux) | falta a regra udev; não use `sudo` |
+| "abrindo COM3: Acesso negado" (Windows) | outro programa está usando a interface (QLC+, outro DMXController aberto): feche-o |
+| "O Windows protegeu o computador" | o programa não é assinado: **Mais informações → Executar assim mesmo** |
+| O iPad não abre a página (Windows) | permita o programa no Firewall do Windows em **Redes privadas** e deixe a rede Wi-Fi como "Rede privada" |
+| O PowerShell não deixa rodar o instalador do ouvido | rode com `powershell -ExecutionPolicy Bypass -File scripts\instalar_ouvido.ps1` |
+| O instalador do ouvido falha no Windows com caminho longo | mova a pasta do programa para um caminho curto, como `C:\DMXController`, e rode de novo |
 | "interface web: … já está aberto em outro terminal?" | o programa já está rodando, ou a porta 8080 está ocupada: feche o outro ou use `-web :8081` |
 | A música carregou, mas a luz não acende | é o padrão: a timeline só acende com a música **tocando** |
 | "Ver nos canhões" não liga ou desliga sozinho | o show tem prioridade: com a música do show tocando, a prévia não vai aos canhões. Também desliga ao trocar de aba ou esconder a página |
@@ -648,9 +713,10 @@ dele (é o que o modo livre usa para escolher):
 | `musicas/` | `X.wav` + timeline `X.json` (+ `X.json.orig` se editada), a ordem em `setlist.txt` e as músicas removidas em `lixeira/` | não (áudio e conteúdo do show) |
 | `.env` | `OPENROUTER_API_KEY` (modelo em `.env.example`) | não |
 | `.ouvido/` | o ouvido de bateria instalado: Python próprio, Demucs, modelo e as baterias já separadas | não |
-| `scripts/` | `instalar_ouvido.sh` (ouvido de bateria), `cdp.mjs` (teste da interface no Chrome), `kit_design.py` (kit do Claude Design, fora de uso) | sim |
+| `scripts/` | `instalar_ouvido.sh` e `instalar_ouvido.ps1` (ouvido de bateria; o `.ps1` é o do Windows), `cdp.mjs` (teste da interface no Chrome), `kit_design.py` (kit do Claude Design, fora de uso) | sim |
 | `docs/img/` | as imagens deste README (prints do modo demonstração) | sim |
-| `.github/workflows/` | CI, releases e a demonstração no GitHub Pages (ver [Desenvolvimento](#desenvolvimento)) | sim |
+| `.github/workflows/` | CI, releases, a demonstração no GitHub Pages e o teste do ouvido no Windows (ver [Desenvolvimento](#desenvolvimento)) | sim |
+| `.gitattributes` | finais de linha LF em todos os sistemas, inclusive no Windows | sim |
 | `design/` | `brief.md` e o kit gerado do Claude Design (fora de uso) | só o `brief.md` |
 | `LICENSE` | licença MIT | sim |
 | `tmp/` | sobras e testes locais | não |
@@ -1321,7 +1387,8 @@ A música é sempre o `file` da `setlist` (`X.json`); fora dela, `404`.
 Um `package main` na raiz (`main.go`, `analisar.go`, `biblioteca.go`) e os
 pacotes de `internal/`:
 
-- **`dmx`**: `Output` (a saída), `OpenDMX` (linux e darwin), `Mock`,
+- **`dmx`**: `Output` (a saída), `OpenDMX` (linux e darwin em `opendmx.go`;
+  windows em `opendmx_windows.go`, pela porta COM), `Mock`,
   `Resilient` (reabre a interface: cabo solto não derruba nada), `Refresher`
   (goroutine própria que reenvia os quadros), `Logger` (`-ver-dmx`) e
   `Remap`.
@@ -1367,8 +1434,11 @@ pacotes de `internal/`:
   `catalog.go` (catálogo de presets com agitação e temperatura).
 - **`sound`**: saída de som e Bluetooth. Linux: `pw-dump`, `wpctl`,
   `bluetoothctl`. Mac: `SwitchAudioSource` e `blueutil` via Homebrew (**não
-  testado**). Preferências em `config/som-<GOOS>.yaml`; a caixa preferida é
-  reconectada sozinha.
+  testado**). Windows (`windows.go`): sem ferramentas externas; mostra só a
+  saída padrão e manda escolher saída e caixa nas Configurações do Windows
+  (o WASAPI do `oto` acompanha a troca da saída padrão). Preferências em
+  `config/som-<GOOS>.yaml`; a caixa preferida é reconectada sozinha (Linux
+  e Mac).
 - **`web`**: HTML único embutido (`static/index.html`, JS puro), WebSocket
   `/ws` e as rotas HTTP do [protocolo](#protocolo-da-interface-web).
   `Importer` = envio e fila de análise; `Health` = alertas;
@@ -1378,12 +1448,17 @@ pacotes de `internal/`:
 **Locks**: o engine chama `source.Render` segurando o lock dele, então
 `Show` nunca chama o engine segurando `s.mu`. O playhead tem lock próprio.
 
+**Windows no `main`**: `console_windows.go` liga as cores ANSI no console (o
+`-ver-dmx`) e, se o programa foi aberto com dois cliques e fecha com erro,
+espera um Enter antes de a janela sumir.
+
 ## Desenvolvimento
 
 ```bash
 go build -o bin/ .                            # bin/DMXController
 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .   # Raspberry Pi
 for a in arm64 amd64; do GOOS=darwin GOARCH=$a CGO_ENABLED=0 go build -o bin/darwin-$a/ .; done
+for a in amd64 arm64; do GOOS=windows GOARCH=$a CGO_ENABLED=0 go build -o bin/windows-$a/ .; done
 go test -race ./...
 gofmt -l .
 ```
@@ -1391,8 +1466,13 @@ gofmt -l .
 - **Testes**: os que usam uma faixa real procuram
   `musicas/praficarcomigo.wav` e `musicas/praficarcomigo.json` (fora do
   repositório) e são pulados sem elas. O resto da suíte usa áudio sintético
-  e um Python de mentira para o ouvido de bateria, e roda em qualquer
-  máquina, sem interface DMX nem placa de som.
+  e um Python de mentira para o ouvido de bateria (o próprio binário de
+  teste, que faz esse papel em `TestMain`), e roda em qualquer sistema, sem
+  interface DMX nem placa de som.
+- **Ouvido de verdade**: `DMX_OUVIDO=.ouvido go test ./internal/analysis -run
+  TestOuvidoReal -v` separa a bateria de uma música sintética com o ouvido
+  instalado e confere que ela fica onde a bateria toca (~12 s num
+  computador comum).
 - **Sempre funcionando**: o modo `-dev mock` e o modo demonstração da página
   (`?demo=1`, sem servidor). Os dados de exemplo ficam em
   `internal/web/static/demo.js`; a `config` dele é a mensagem real do
@@ -1417,9 +1497,10 @@ gofmt -l .
 
 | Workflow | Quando roda | O que faz |
 |---|---|---|
-| `ci.yml` | cada push na `main` e cada pull request | `gofmt`, `go vet`, `go test -race` e a compilação para Linux (amd64, arm64) e Mac (arm64, amd64) |
-| `release.yml` | ao enviar uma tag `v*` | testes, compila as 4 plataformas e cria a release com um `.tar.gz` por plataforma (binário, `config/`, `.env.example`, script do ouvido, README e licença) e o `SHA256SUMS` |
+| `ci.yml` | cada push na `main` e cada pull request | no Linux: `gofmt`, `go vet`, `go test -race` e a compilação para Linux (amd64, arm64), Mac (arm64, amd64) e Windows (amd64, arm64); num Windows de verdade: `go vet` e `go test` |
+| `release.yml` | ao enviar uma tag `v*` | testes, compila as 6 plataformas e cria a release com um pacote por plataforma (`.zip` no Windows, `.tar.gz` nas outras: binário, `config/`, `.env.example`, script do ouvido, README e licença) e o `SHA256SUMS` |
 | `demo.yml` | push na `main` que mexe em `internal/web/static/`, ou à mão | publica o modo demonstração no GitHub Pages |
+| `ouvido-windows.yml` | só à mão (Actions → "Ouvido no Windows" → Run workflow) | num Windows limpo, roda `scripts\instalar_ouvido.ps1` e o `TestOuvidoReal` (~1,2 GB de download, alguns minutos) |
 
 - **Publicar uma versão**: `git tag v1.0.0 && git push origin v1.0.0`.
 - **Demonstração**: uma vez só, em Settings → Pages → Build and deployment,
@@ -1480,6 +1561,10 @@ documentação ficam em português do Brasil. Antes de mandar uma mudança:
 - **Configuração em YAML**, nada de endereços no código. Sempre manter o
   modo mock funcionando.
 - **Não rodar com `sudo`.**
+- **Windows sem ferramentas externas** (decisão de 07/11/2026): o programa
+  continua um binário só. A saída de som e o Bluetooth ficam nas
+  Configurações do Windows, e a interface DMX usa o driver VCP da FTDI que o
+  Windows instala sozinho (nada de D2XX nem de instalar programas).
 - **Repositório público** (desde 07/11/2026): nada de chaves, áudio das
   músicas, endereços de aparelhos ou dados pessoais no repositório (nem em
   testes e dados de exemplo). Nomes de pessoas só com autorização (Amós
@@ -1487,7 +1572,8 @@ documentação ficam em português do Brasil. Antes de mandar uma mudança:
 
 ## Estado atual e próximos passos
 
-Atualizado em 07/11/2026, na preparação para publicar o repositório.
+Atualizado em 07/11/2026, depois da publicação do repositório e do suporte
+ao Windows.
 
 Tudo o que este README descreve está pronto e foi testado no Linux: a suíte
 de testes passa, e as funções foram conferidas com a IA de verdade e pela
@@ -1505,6 +1591,14 @@ seja, nenhum flash branco: conferir se é o esperado.
 ### Ainda não testado ou não conferido
 
 - **Raspberry Pi e Mac**: nada foi testado em nenhum dos dois.
+- **Windows**: o programa compila para Windows (amd64 e ARM64) e os testes
+  compilam, mas nunca rodaram num Windows de verdade. O job `windows` do CI
+  roda a suíte a cada push; falta abrir o programa num PC com Windows e
+  conferir: o DMX pela porta COM com a SL1000 (tempo do break, DTR e RTS
+  ligados como no Linux, ~27 quadros/s), a detecção da porta (`-dev auto`),
+  o som e a troca da saída padrão, o Firewall com o iPad, a janela que
+  espera o Enter e o instalador do ouvido (dá para rodar o workflow
+  `ouvido-windows.yml`).
 - **Prévia com som no iPad/Safari.**
 - **Ver nos canhões com canhões de verdade**: conferido só pelo log de canais
   (`-ver-dmx`) e no Chrome headless. O atraso do som do aparelho da prévia
@@ -1561,6 +1655,9 @@ seja, nenhum flash branco: conferir se é o esperado.
 - **Usar mais o ouvido**: bumbo × caixa na luz (ex.: a luz "bombear" no
   bumbo), detectar viradas e subidas, ouvir também o baixo (o modelo já
   separa baixo, voz e resto).
+- **Som pela página no Windows**: listar e trocar a saída e parear a caixa
+  pela aba Som, como no Linux (precisaria das APIs de áudio e Bluetooth do
+  Windows, sem ferramenta de linha de comando pronta).
 
 ### Próxima sessão C — ajuste fino com IA (para Amós)
 
@@ -1687,6 +1784,16 @@ programa.
   como efeito, nome de faixa e endereço Bluetooth fictícios); endereço
   Bluetooth e serial da interface retirados de testes e documentação;
   crédito a Amós Junior pelos presets, com a autorização dele.
+- **Windows (07/11/2026)** ("quero fazer o projeto funcionar em Windows"):
+  driver DMX pela porta COM do driver VCP da FTDI (`opendmx_windows.go`,
+  detecção pelo registro), backend de som do Windows (saída padrão;
+  Bluetooth nas Configurações), ouvido de bateria no Windows
+  (`instalar_ouvido.ps1` e o Python em `venv\Scripts`), nomes reservados do
+  Windows (`CON`, `NUL`, `COM1`…) evitados no envio de músicas, janela que
+  espera o Enter ao fechar com erro, `.gitattributes` com LF; CI com um job
+  no Windows e releases em `.zip` para Windows. O Python de mentira dos
+  testes virou o próprio binário de teste (o script `sh` não roda no
+  Windows), e entrou o `TestOuvidoReal`, que usa o ouvido instalado.
 
 ## Licença
 

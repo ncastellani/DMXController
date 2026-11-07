@@ -3,7 +3,8 @@
 // configurações (atraso, volume) entre execuções.
 //
 // Linux usa pw-dump/wpctl (PipeWire) e bluetoothctl (BlueZ); macOS usa
-// SwitchAudioSource e blueutil (brew install switchaudio-osx blueutil).
+// SwitchAudioSource e blueutil (brew install switchaudio-osx blueutil). No
+// Windows, a saída e a caixa ficam nas Configurações do sistema (windows.go).
 package sound
 
 import (

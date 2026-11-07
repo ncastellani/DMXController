@@ -1,5 +1,5 @@
-# Confere cada push e pull request: formatação, vet, testes e se o programa
-# compila para as plataformas do show (Raspberry Pi e Mac).
+# Confere cada push e pull request: formatação, vet, testes (no Linux e no
+# Windows) e se o programa compila para Linux, Raspberry Pi, Mac e Windows.
 name: CI
 
 on:
@@ -35,9 +35,24 @@ jobs:
       - name: Testes
         run: go test -race ./...
 
-      - name: Compila para Linux, Raspberry Pi e Mac
+      - name: Compila para Linux, Raspberry Pi, Mac e Windows
         run: |
-          for alvo in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
+          for alvo in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
             echo "== $alvo"
             GOOS=${alvo%/*} GOARCH=${alvo#*/} CGO_ENABLED=0 go build -o /dev/null .
           done
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Testes
+        run: go test ./...

@@ -217,3 +217,30 @@ func TestManagerBusyAndErrors(t *testing.T) {
 		t.Fatalf("erro de pareamento: %+v", m.State())
 	}
 }
+
+// TestWindows: no Windows a saída é a padrão do sistema e o Bluetooth fica
+// nas Configurações; as ações dizem onde fazer, sem guardar caixa nenhuma.
+func TestWindows(t *testing.T) {
+	m, _ := NewManager(NewWindows(), filepath.Join(t.TempDir(), "som.yaml"), nil, func(string, ...any) {})
+	if miss := NewWindows().Missing(); len(miss) != 0 {
+		t.Fatalf("no Windows não falta ferramenta: %v", miss)
+	}
+	ctx := context.Background()
+	m.refresh(ctx)
+	st := m.State()
+	if len(st.Outputs) != 1 || !st.Outputs[0].Default || len(st.Devices) != 0 {
+		t.Fatalf("saídas %+v, aparelhos %+v", st.Outputs, st.Devices)
+	}
+	m.Do(ctx, "output", WindowsOutput)
+	waitIdle(t, m)
+	if m.State().Error != "" {
+		t.Fatalf("escolher a saída padrão: %q", m.State().Error)
+	}
+	for _, a := range []string{"scan", "pair"} {
+		m.Do(ctx, a, "AA")
+		waitIdle(t, m)
+		if !strings.Contains(m.State().Error, "Configurações → Bluetooth") || m.Settings().Speaker != "" {
+			t.Fatalf("%s: estado %+v, caixa %q", a, m.State(), m.Settings().Speaker)
+		}
+	}
+}

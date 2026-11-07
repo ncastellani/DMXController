@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +22,8 @@ import (
 // (Demucs, em Python) isola a bateria da música, e a análise passa a ouvir
 // bumbo, caixa e chimbal limpos, sem voz nem sintetizador no meio. É
 // opcional: fica num ambiente Python à parte (pasta .ouvido, instalada por
-// scripts/instalar_ouvido.sh); sem ele, a análise segue só com o que há em Go.
+// scripts/instalar_ouvido.sh, ou instalar_ouvido.ps1 no Windows); sem ele, a
+// análise segue só com o que há em Go.
 
 //go:embed bateria.py
 var bateriaPy []byte
@@ -38,14 +40,22 @@ type Separator struct {
 
 // FindSeparator devolve o ouvido instalado em dir (".ouvido"), ou nil.
 func FindSeparator(dir string) *Separator {
-	py := filepath.Join(dir, "venv", "bin", "python")
-	if st, err := os.Stat(py); err != nil || st.IsDir() {
+	if st, err := os.Stat(pythonIn(dir)); err != nil || st.IsDir() {
 		return nil
 	}
 	if abs, err := filepath.Abs(dir); err == nil {
 		dir = abs
 	}
-	return &Separator{Python: filepath.Join(dir, "venv", "bin", "python"), Cache: filepath.Join(dir, "bateria")}
+	return &Separator{Python: pythonIn(dir), Cache: filepath.Join(dir, "bateria")}
+}
+
+// pythonIn é o Python do ambiente do ouvido em dir (o venv do Windows guarda
+// os executáveis em Scripts, com .exe).
+func pythonIn(dir string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(dir, "venv", "Scripts", "python.exe")
+	}
+	return filepath.Join(dir, "venv", "bin", "python")
 }
 
 // fileKey identifica o conteúdo de um arquivo.

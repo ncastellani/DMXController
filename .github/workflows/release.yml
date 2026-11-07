@@ -1,8 +1,9 @@
 # Publica uma versão: ao enviar uma tag v* (ex.: git tag v1.0.0 && git push
-# origin v1.0.0), compila o programa para Linux (PC e Raspberry Pi) e Mac e
-# anexa um .tar.gz por plataforma à página de releases do GitHub. Cada pacote
-# traz o binário com a configuração (config/), o exemplo do .env, o script do
-# ouvido de bateria, o README e a licença: é só extrair e rodar.
+# origin v1.0.0), compila o programa para Linux (PC e Raspberry Pi), Mac e
+# Windows e anexa um pacote por plataforma à página de releases do GitHub
+# (.zip no Windows, .tar.gz nos outros). Cada pacote traz o binário com a
+# configuração (config/), o exemplo do .env, o script do ouvido de bateria, o
+# README e a licença: é só extrair e rodar.
 name: Release
 
 on:
@@ -28,20 +29,25 @@ jobs:
       - name: Compila e empacota
         run: |
           mkdir -p dist
-          for alvo in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
+          for alvo in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
             os=${alvo%/*}; arch=${alvo#*/}
             nome="DMXController-${GITHUB_REF_NAME}-${os}-${arch}"
             pasta="dist/$nome/DMXController"
             mkdir -p "$pasta/config" "$pasta/scripts"
             GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$pasta/" .
             cp config/console.yaml config/fixtures.yaml config/patch.yaml config/biblioteca.yaml "$pasta/config/"
-            cp scripts/instalar_ouvido.sh "$pasta/scripts/"
             cp .env.example README.md LICENSE "$pasta/"
-            tar -C "dist/$nome" -czf "dist/$nome.tar.gz" DMXController
+            if [ "$os" = windows ]; then
+              cp scripts/instalar_ouvido.ps1 "$pasta/scripts/"
+              (cd "dist/$nome" && zip -qr "../$nome.zip" DMXController)
+            else
+              cp scripts/instalar_ouvido.sh "$pasta/scripts/"
+              tar -C "dist/$nome" -czf "dist/$nome.tar.gz" DMXController
+            fi
           done
-          (cd dist && sha256sum -- *.tar.gz > SHA256SUMS)
+          (cd dist && sha256sum -- *.tar.gz *.zip > SHA256SUMS)
 
       - name: Cria a release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS --generate-notes --title "$GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip dist/SHA256SUMS --generate-notes --title "$GITHUB_REF_NAME"

@@ -273,7 +273,24 @@ func cleanName(name string) (string, error) {
 	if r := []rune(base); len(r) > 120 {
 		base = string(r[:120])
 	}
+	if windowsReserved(base) {
+		base = "_" + base
+	}
 	return base + ".wav", nil
+}
+
+// windowsReserved diz se o nome (até o primeiro ponto) é um dos nomes de
+// aparelho do Windows, que não servem de nome de arquivo nem com extensão:
+// CON, PRN, AUX, NUL, COM1 a COM9 e LPT1 a LPT9. Vale em todo sistema, para
+// a pasta de músicas poder ir de um computador para outro.
+func windowsReserved(base string) bool {
+	stem, _, _ := strings.Cut(base, ".")
+	stem = strings.ToUpper(strings.TrimSpace(stem))
+	switch stem {
+	case "CON", "PRN", "AUX", "NUL":
+		return true
+	}
+	return len(stem) == 4 && (strings.HasPrefix(stem, "COM") || strings.HasPrefix(stem, "LPT")) && stem[3] >= '1' && stem[3] <= '9'
 }
 
 func exists(p string) bool {

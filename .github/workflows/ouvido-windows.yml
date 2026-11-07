@@ -1,0 +1,31 @@
+# Confere o ouvido de bateria no Windows, numa máquina limpa: roda o
+# instalador (scripts/instalar_ouvido.ps1, no Windows PowerShell que já vem
+# no sistema) e separa a bateria de uma música de teste (TestOuvidoReal).
+# Baixa cerca de 1,2 GB e leva alguns minutos: roda só à mão, em Actions →
+# "Ouvido no Windows" → Run workflow.
+name: Ouvido no Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ouvido:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Instala o ouvido de bateria
+        shell: powershell
+        run: scripts\instalar_ouvido.ps1
+
+      - name: Separa a bateria de uma música de teste
+        env:
+          DMX_OUVIDO: ${{ github.workspace }}\.ouvido
+        run: go test ./internal/analysis -run TestOuvidoReal -v

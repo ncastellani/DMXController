@@ -46,6 +46,11 @@ func TestCleanName(t *testing.T) {
 		`C:\\Users\\x\\Balada.WAV`: "Balada.wav",
 		"música: ação?.wav":        "música_ ação_.wav",
 		".escondido.wav":           "escondido.wav",
+		"con.wav":                  "_con.wav", // nomes reservados do Windows
+		"COM1.wav":                 "_COM1.wav",
+		"nul.ao vivo.wav":          "_nul.ao vivo.wav",
+		"Console.wav":              "Console.wav",
+		"COM10.wav":                "COM10.wav",
 	} {
 		if got, err := cleanName(in); err != nil || got != want {
 			t.Errorf("cleanName(%q) = %q, %v; quero %q", in, got, err, want)

@@ -62,8 +62,11 @@ type Manager struct {
 
 // New escolhe o backend do sistema operacional.
 func New() Backend {
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		return NewDarwin()
+	case "windows":
+		return NewWindows()
 	}
 	return NewLinux()
 }

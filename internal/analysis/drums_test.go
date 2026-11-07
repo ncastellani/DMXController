@@ -2,12 +2,16 @@ package analysis
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ncastellani/DMXController/internal/audio"
 )
 
 // drumSong monta uma música de 64 s a 120 BPM: notas e acordes o tempo todo
@@ -134,24 +138,61 @@ func TestAnalyzeDrums(t *testing.T) {
 	}
 }
 
-// fakeEar monta um "Python" de mentira que copia a música para a saída.
+// TestMain deixa o próprio binário de teste fazer o papel do Python do ouvido
+// (ver fakeEar): assim o teste roda igual no Linux, no Mac e no Windows.
+func TestMain(m *testing.M) {
+	if dir := os.Getenv("DMX_FAKE_EAR"); dir != "" {
+		os.Exit(fakeEarMain(dir))
+	}
+	os.Exit(m.Run())
+}
+
+// fakeEarMain é o "Python" de mentira, chamado como o de verdade
+// (python - <música> <saída>, com o script na entrada): avisa o andamento,
+// falha se dir/falhar existe e devolve a própria música como "bateria".
+func fakeEarMain(dir string) int {
+	io.Copy(io.Discard, os.Stdin)
+	fmt.Println("progresso 50")
+	if _, err := os.Stat(filepath.Join(dir, "falhar")); err == nil {
+		fmt.Fprintln(os.Stderr, "Traceback")
+		fmt.Fprintln(os.Stderr, "RuntimeError: erro de teste")
+		return 3
+	}
+	if f, err := os.OpenFile(filepath.Join(dir, "chamadas"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+		f.WriteString("x\n")
+		f.Close()
+	}
+	data, err := os.ReadFile(os.Args[2])
+	if err != nil {
+		return 1
+	}
+	if err := os.WriteFile(os.Args[3], data, 0o644); err != nil {
+		return 1
+	}
+	return 0
+}
+
+// fakeEar monta um ouvido de mentira: o "Python" do ambiente é uma cópia do
+// binário de teste, que vira fakeEarMain com DMX_FAKE_EAR definido.
 func fakeEar(t *testing.T) (*Separator, string) {
 	t.Helper()
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "venv", "bin")
-	if err := os.MkdirAll(bin, 0o755); err != nil {
+	py := pythonIn(dir)
+	if err := os.MkdirAll(filepath.Dir(py), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	script := `#!/bin/sh
-cat > /dev/null
-echo "progresso 50"
-if [ -f "` + dir + `/falhar" ]; then echo "Traceback" >&2; echo "RuntimeError: erro de teste" >&2; exit 3; fi
-echo x >> "` + dir + `/chamadas"
-cp "$2" "$3"
-`
-	if err := os.WriteFile(filepath.Join(bin, "python"), []byte(script), 0o755); err != nil {
+	self, err := os.Executable()
+	if err != nil {
 		t.Fatal(err)
 	}
+	bin, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(py, bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DMX_FAKE_EAR", dir)
 	s := FindSeparator(dir)
 	if s == nil || !filepath.IsAbs(s.Python) || !filepath.IsAbs(s.Cache) {
 		t.Fatalf("FindSeparator: %+v", s)
@@ -211,7 +252,7 @@ func TestGenerateWithEar(t *testing.T) {
 	if err != nil || warn != "" || !tl.Analysis.Drums || !strings.Contains(string(tl.Generated), `"drums":true`) || !strings.Contains(strings.Join(stages, "|"), "separando a bateria (50%)") {
 		t.Fatalf("com o ouvido: %v, aviso %q, drums %v, etapas %v", err, warn, tl.Analysis.Drums, stages)
 	}
-	os.Remove(s.Cache + "/" + filepath.Base(mustGlob(t, s.Cache+"/*")))
+	os.Remove(mustGlob(t, filepath.Join(s.Cache, "*")))
 	os.WriteFile(filepath.Join(dir, "falhar"), nil, 0o644)
 	tl, warn, err = Generate(context.Background(), wav, catalog(t), Options{Separator: s})
 	if err != nil || tl.Analysis.Drums || !strings.Contains(warn, "ouvido de bateria") || !strings.Contains(warn, "erro de teste") || len(tl.Cues) == 0 {
@@ -226,4 +267,52 @@ func mustGlob(t *testing.T, pattern string) string {
 		t.Fatalf("%s: %v", pattern, m)
 	}
 	return m[0]
+}
+
+// TestOuvidoReal usa o ouvido de bateria instalado de verdade (DMX_OUVIDO =
+// a pasta dele, ex.: .ouvido): separa a bateria de uma música sintética com
+// trecho sem bateria e confere que a bateria separada fica onde ela toca.
+// Serve para conferir uma instalação (no Windows, scripts/instalar_ouvido.ps1).
+func TestOuvidoReal(t *testing.T) {
+	dir := os.Getenv("DMX_OUVIDO")
+	if dir == "" {
+		t.Skip("defina DMX_OUVIDO com a pasta do ouvido de bateria")
+	}
+	s := FindSeparator(dir)
+	if s == nil {
+		t.Fatalf("ouvido de bateria não encontrado em %s", dir)
+	}
+	s.Cache = t.TempDir() // não mexe no cache de verdade
+	y, _ := drumSong()
+	y = y[8*SR : 40*SR] // 8 s sem bateria e 24 s com
+	wav := filepath.Join(t.TempDir(), "musica.wav")
+	if err := os.WriteFile(wav, wav16k(y), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stages []string
+	out, err := s.Drums(context.Background(), wav, func(st string) { stages = append(stages, st) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := audio.LoadWAV(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Mono(tr)
+	rms := func(from, to float64) float64 {
+		var sum float64
+		a, b := int(from*SR), min(len(d), int(to*SR))
+		for _, v := range d[a:b] {
+			sum += v * v
+		}
+		return math.Sqrt(sum / float64(max(1, b-a)))
+	}
+	without, with := rms(0.5, 7.5), rms(9, 31)
+	t.Logf("bateria separada: RMS %.4f sem bateria, %.4f com; %d avisos de andamento", without, with, len(stages))
+	if with < 0.02 || with < 5*without {
+		t.Errorf("a bateria separada deveria ficar onde ela toca: RMS %.4f sem, %.4f com", without, with)
+	}
+	if a := AnalyzeDrums(y, d); !a.Drums || !strings.ContainsAny(a.HitKind, "ks") {
+		t.Errorf("análise com a bateria separada: drums %v, peças %q", a.Drums, a.HitKind)
+	}
 }

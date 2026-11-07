@@ -689,12 +689,12 @@ body.off main, body.off .master { opacity: .4; pointer-events: none; }
       <div class="card">
         <div class="head"><div class="title">Saída de som</div><span class="busy" id="sndBusy"></span></div>
         <div class="outs" id="sndOuts"></div>
-        <p class="hint">Escolha por onde a música sai: caixa Bluetooth, cabo P2 (fone) ou alto-falante do computador.</p>
+        <p class="hint" id="sndOutsHint">Escolha por onde a música sai: caixa Bluetooth, cabo P2 (fone) ou alto-falante do computador.</p>
       </div>
       <div class="card">
         <div class="head"><div class="title">Caixa Bluetooth</div><button class="small" id="btScan">Procurar caixas</button></div>
         <div class="devs" id="btDevs"></div>
-        <p class="hint">Para parear, coloque a caixa em modo de pareamento e toque em “Procurar caixas”. A caixa conectada pela última vez é reconectada sozinha se cair.</p>
+        <p class="hint" id="btHint">Para parear, coloque a caixa em modo de pareamento e toque em “Procurar caixas”. A caixa conectada pela última vez é reconectada sozinha se cair.</p>
         <p class="hint err" id="sndErr" hidden></p>
       </div>
       <div class="card">
@@ -1439,14 +1439,16 @@ const KIND = { bluetooth: ["🔵", "Bluetooth"], wired: ["🎧", "Cabo (P2)"], b
 
 function renderSound() {
   const sn = sound;
-  const miss = $("#sndMissing");
-  miss.hidden = !(sn.missing && sn.missing.length);
-  if (!miss.hidden) miss.textContent = sn.platform === "darwin"
+  const miss = $("#sndMissing"), win = sn.platform === "windows";
+  miss.hidden = !win && !(sn.missing && sn.missing.length);
+  if (win) miss.textContent = "No Windows, a saída de som e a caixa Bluetooth se escolhem nas Configurações do Windows (Sistema → Som; Bluetooth e dispositivos). O programa toca na saída padrão e acompanha quando ela muda. Atraso e volume ficam aqui.";
+  else if (!miss.hidden) miss.textContent = sn.platform === "darwin"
     ? `Para controlar a saída e o Bluetooth por aqui, instale no Mac: brew install ${sn.missing.join(" ")}`
     : `Ferramentas ausentes: ${sn.missing.join(", ")}`;
   $("#sndBusy").textContent = sn.busy || "";
   const err = $("#sndErr"); err.hidden = !sn.error; err.textContent = sn.error || "";
-  $("#btScan").disabled = !!sn.busy || !sn.available;
+  $("#btScan").disabled = !!sn.busy || !sn.available || win;
+  $("#sndOutsHint").hidden = $("#btHint").hidden = win; // no Windows, o aviso do topo diz onde fazer
 
   const outs = $("#sndOuts"); outs.innerHTML = "";
   for (const o of sn.outputs || []) {
@@ -1481,7 +1483,9 @@ function renderSound() {
     if (d.paired) btn("Esquecer", "forget", `Esquecer “${d.name}”? Vai precisar parear de novo.`);
     devs.append(row);
   }
-  if (!(sn.devices || []).length) devs.innerHTML = `<p class="hint">Nenhuma caixa conhecida. Toque em “Procurar caixas”.</p>`;
+  if (!(sn.devices || []).length) devs.innerHTML = win
+    ? `<p class="hint">No Windows, pareie e conecte a caixa em Configurações → Bluetooth e dispositivos.</p>`
+    : `<p class="hint">Nenhuma caixa conhecida. Toque em “Procurar caixas”.</p>`;
 }
 
 $("#btScan").onclick = () => send({ type: "sound", arg: "scan" });

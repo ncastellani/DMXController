@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Separa a bateria de uma música (Demucs) para o DMXController ouvir a batida.
 
     python bateria.py <musica.wav> <bateria.wav>
@@ -5,7 +6,7 @@
 Lê a música, separa os instrumentos com o modelo htdemucs e grava só a
 bateria (mono, 16 bits, 22,05 kHz: a taxa em que o DMXController analisa). Imprime o andamento em linhas
 "progresso <0-100>". O DMXController chama este script (com o Python do
-ambiente instalado por scripts/instalar_ouvido.sh) na análise de cada música e
+ambiente instalado por scripts/instalar_ouvido.sh ou .ps1) na análise de cada música e
 guarda o resultado em cache; sem o ambiente, a análise segue sem ele.
 """
 import os

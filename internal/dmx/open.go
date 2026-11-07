@@ -4,12 +4,22 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+)
+
+// Tempos do quadro. Os drivers FTDI ligam/desligam o break por mensagens USB,
+// então os valores reais ficam na casa de ~1 ms (bem acima do mínimo e
+// dentro da norma).
+const (
+	breakTime = 120 * time.Microsecond
+	mabTime   = 12 * time.Microsecond
 )
 
 // Open abre a saída indicada:
 //   - "mock": simulador (escreve as mudanças em mockLog, se não for nil);
 //   - "auto": a primeira interface FTDI encontrada;
-//   - outro valor: o caminho da porta serial de uma interface Open DMX.
+//   - outro valor: a porta serial de uma interface Open DMX (/dev/ttyUSB0 no
+//     Linux, /dev/cu.usbserial-XXXX no Mac, COM3 no Windows).
 func Open(device string, mockLog io.Writer) (Output, error) {
 	switch device {
 	case "mock":

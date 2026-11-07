@@ -37,19 +37,27 @@ import (
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "analisar" {
 		if err := analisar(os.Args[2:]); err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "biblioteca" {
 		if err := biblioteca(os.Args[2:]); err != nil {
-			log.Fatal(err)
+			fatal(err)
 		}
 		return
 	}
 	if err := run(); err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
+}
+
+// fatal mostra o erro e encerra. No Windows, aberto com dois cliques, espera
+// um Enter antes de a janela fechar.
+func fatal(err error) {
+	log.Print(err)
+	waitBeforeClosing()
+	os.Exit(1)
 }
 
 func run() error {
