@@ -44,6 +44,9 @@ func analisar(args []string) error {
 		os.Exit(2)
 	}
 
+	if _, err := ensureConfig(configFiles(*consolePath, *profiles, *patch)...); err != nil {
+		return fmt.Errorf("gravando a configuração padrão: %w", err)
+	}
 	fixtures, err := fixture.Load(*profiles, *patch)
 	if err != nil {
 		return err

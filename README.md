@@ -12,8 +12,9 @@ computador ao mesmo tempo.
 ![Aba Show: player com as partes da música, curva de energia e fritações (⚡); no topo, a cor de cada canhão agora](docs/img/show.png)
 
 Feito em Go para o pequeno show de um cantor (voz ao vivo sobre playback, 3
-canhões LED RGB). É um binário só e **não tem interface no terminal**: ele
-imprime os endereços da página, e todo o controle e o log ficam nela. Foi
+canhões LED RGB). É um binário só (a configuração padrão vai embutida nele)
+e **não tem interface no terminal**: ele mostra a partida e os endereços da
+página, e todo o controle e o log ficam nela. Foi
 desenvolvido e testado no Linux (Ubuntu); no show vai rodar num **Raspberry
 Pi 5**. Também roda no **Windows** e no **Mac** (ainda não testados com o
 equipamento).
@@ -212,6 +213,11 @@ O pacote traz o binário, a configuração (`config/`), o `.env.example`, o
 script do ouvido de bateria, este README e a licença. O `SHA256SUMS` da
 release confere os downloads (`sha256sum -c SHA256SUMS --ignore-missing`).
 
+**O executável sozinho também funciona** (ex.: só o `DMXController.exe`
+copiado para um Windows): a configuração padrão vai embutida nele, e na
+primeira vez ele cria a pasta `config/` ao lado, com os quatro arquivos. Os
+arquivos que já existem nunca são sobrescritos.
+
 ### Compilar a partir do código
 
 Precisa do Go 1.26 ou mais novo.
@@ -264,9 +270,11 @@ Se o sistema bloquear o binário, rode `xattr -d com.apple.quarantine DMXControl
 ### Windows (ainda não testado)
 
 1. **Extraia o `.zip` numa pasta de caminho curto**, como `C:\DMXController`
-   (o ouvido de bateria tem arquivos com caminhos longos).
-2. **Abra o `DMXController.exe`** com dois cliques, ou num terminal
-   (PowerShell) dentro da pasta, para passar opções:
+   (o ouvido de bateria tem arquivos com caminhos longos). Para só
+   experimentar, basta o `DMXController.exe` numa pasta: ele cria o resto.
+2. **Abra o `DMXController.exe`** com dois cliques: abre uma janela de
+   terminal que mostra o programa subindo e o endereço do servidor HTTP.
+   Para passar opções, abra num terminal (PowerShell) dentro da pasta:
 
    ```powershell
    .\DMXController.exe -dev mock
@@ -344,9 +352,23 @@ Músicas diz se o ouvido está ligado.
 ./DMXController -dev mock          # no Windows: .\DMXController.exe -dev mock
 ```
 
-O terminal mostra os endereços da interface (ex.: `http://localhost:8080` e
-`http://192.168.0.10:8080`). Abra o primeiro no navegador do computador ou o
-segundo no iPad ou no celular, conectado à mesma rede Wi-Fi. Todos os
+O terminal mostra a partida e os endereços da interface:
+
+```text
+DMXController: iniciando
+  canhões: esquerda d001, centro d008, direita d015
+  console: 55 botões em 4 grupos
+  DMX: modo de teste (-dev mock), nada vai para a interface
+  som: pronto (saída padrão do sistema)
+  músicas: 0 em musicas
+Servidor HTTP no ar. Abra a interface no navegador:
+  http://localhost:8080
+  http://192.168.0.10:8080   (Wi-Fi)
+Ctrl+C apaga tudo e encerra.
+```
+
+Abra o primeiro endereço no navegador do computador ou o segundo no iPad ou
+no celular, conectado à mesma rede Wi-Fi. Todos os
 aparelhos abertos veem e comandam o mesmo show ao mesmo tempo.
 
 Com `-dev mock` nada vai para a interface DMX, mas todo o resto funciona:
@@ -704,6 +726,7 @@ dele (é o que o modo livre usa para escolher):
 | Caminho | O que é | No git? |
 |---|---|---|
 | `main.go`, `analisar.go`, `biblioteca.go` | o programa (servidor) e os subcomandos `analisar` e `biblioteca` | sim |
+| `padrao.go`, `console_windows.go` | a configuração padrão embutida no binário; o console do Windows | sim |
 | `internal/` | código: `dmx`, `fixture`, `library`, `engine`, `control`, `show`, `audio`, `analysis`, `sound`, `web` | sim |
 | `config/console.yaml` | botões do console (cada um aponta para um preset da biblioteca) e limites de segurança | sim |
 | `config/fixtures.yaml` | perfil dos canhões: função de cada canal e `strobe_mode` | sim |
@@ -736,6 +759,10 @@ lá.
   intervalo. É gravado pela interface.
 - **Sem endereços no código**: tudo o que depende do equipamento vem desses
   arquivos.
+- **Configuração padrão embutida**: os quatro arquivos de `config/` do
+  repositório vão dentro do binário (`padrao.go`). Se algum faltar, o
+  programa o cria com o conteúdo padrão ao iniciar; um arquivo que existe
+  nunca é sobrescrito.
 
 ## Biblioteca de presets
 
@@ -1452,6 +1479,10 @@ pacotes de `internal/`:
 `-ver-dmx`) e, se o programa foi aberto com dois cliques e fecha com erro,
 espera um Enter antes de a janela sumir.
 
+**Configuração padrão**: `padrao.go` embute `config/*.yaml` no binário e,
+ao iniciar (servidor e `analisar`), `ensureConfig` cria os arquivos que
+faltam.
+
 ## Desenvolvimento
 
 ```bash
@@ -1558,8 +1589,9 @@ documentação ficam em português do Brasil. Antes de mandar uma mudança:
   a integração mantém protocolo, lógica de fritação, reconexão, alertas,
   sincronização da lista e modo demonstração. Ao redesenhar, ele tende a
   voltar para o tema claro: corrigir na integração.
-- **Configuração em YAML**, nada de endereços no código. Sempre manter o
-  modo mock funcionando.
+- **Configuração em YAML**, nada de endereços no código. A do repositório
+  vai embutida no binário só como padrão, para o executável rodar sozinho;
+  os arquivos de `config/` mandam. Sempre manter o modo mock funcionando.
 - **Não rodar com `sudo`.**
 - **Windows sem ferramentas externas** (decisão de 07/11/2026): o programa
   continua um binário só. A saída de som e o Bluetooth ficam nas
@@ -1794,6 +1826,11 @@ programa.
   no Windows e releases em `.zip` para Windows. O Python de mentira dos
   testes virou o próprio binário de teste (o script `sh` não roda no
   Windows), e entrou o `TestOuvidoReal`, que usa o ouvido instalado.
+- **Executável sozinho (07/11/2026)** ("um arquivo .exe que rode no Windows
+  e mostre um terminal subindo o programa e o servidor HTTP"): a
+  configuração padrão vai embutida no binário e é criada em `config/` se
+  faltar, e o terminal mostra a partida passo a passo (canhões, console,
+  DMX, som, músicas e o servidor HTTP no ar).
 
 ## Licença
 

@@ -71,10 +71,18 @@ func run() error {
 	// Um arquivo por sistema: ids de saída e endereços Bluetooth mudam de formato.
 	showDMX := flag.Bool("ver-dmx", false, "mostra no terminal os canais DMX enviados (quando mudam, até 10 linhas/s)")
 	model := flag.String("modelo", analysis.DefaultModel, "modelo do OpenRouter para analisar músicas novas")
-	earDir := flag.String("ouvido", ".ouvido", "pasta do ouvido de bateria (separa a bateria na análise; instale com scripts/instalar_ouvido.sh)")
+	earDir := flag.String("ouvido", ".ouvido", "pasta do ouvido de bateria (separa a bateria na análise; instale com "+earInstaller()+")")
 	soundPath := flag.String("som", "config/som-"+runtime.GOOS+".yaml", "preferências de som (atraso, volume, saída, caixa)")
 	flag.Parse()
 
+	fmt.Println("DMXController: iniciando")
+	created, err := ensureConfig(configFiles(*consolePath, *profiles, *patch)...)
+	for _, p := range created {
+		fmt.Printf("  criei %s com a configuração padrão\n", p)
+	}
+	if err != nil {
+		return fmt.Errorf("gravando a configuração padrão: %w", err)
+	}
 	fixtures, err := fixture.Load(*profiles, *patch)
 	if err != nil {
 		return err
@@ -88,6 +96,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("  canhões: %s\n", describeRig(rig))
+	fmt.Printf("  console: %d botões em %d grupos\n", len(console.Buttons), len(console.Groups))
 
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -110,9 +120,11 @@ func run() error {
 	// cair), a música e a interface web continuam e ela é reaberta sozinha.
 	var out dmx.Output
 	if *device == "mock" {
+		fmt.Println("  DMX: modo de teste (-dev mock), nada vai para a interface")
 		out = dmx.NewMock(nil)
 		health.SetDMX(true, nil)
 	} else {
+		fmt.Printf("  DMX: procurando a interface (-dev %s)\n", *device)
 		out = dmx.NewResilient(func() (dmx.Output, error) { return dmx.Open(*device, nil) }, func(ok bool, err error) {
 			health.SetDMX(ok, err)
 			if ok {
@@ -139,11 +151,14 @@ func run() error {
 	if err != nil {
 		log.Printf("aviso: sem saída de som (%v); a luz do show segue um relógio interno", err)
 		player = nil
+	} else {
+		fmt.Println("  som: pronto (saída padrão do sistema)")
 	}
 	sh := show.New(*songsDir, show.NewPresets(console.Library, positions), eng, player, console.Limits.Flash, ctl.Notice)
 	if err := sh.Scan(); err != nil {
 		log.Printf("aviso: setlist: %v", err)
 	}
+	fmt.Printf("  músicas: %d em %s\n", len(sh.Songs()), *songsDir)
 
 	// Interface nil (não um *audio.Player nil) quando não há saída de som.
 	var soundPlayer sound.Player
@@ -160,7 +175,7 @@ func run() error {
 	importer := &web.Importer{Dir: *songsDir, Catalog: analysis.Catalog(console), APIKey: analysis.APIKey(".env"), Model: *model, Library: console.Library, Separator: analysis.FindSeparator(*earDir)}
 	srv.SetImporter(importer)
 	if importer.Separator == nil {
-		log.Print("aviso: sem o ouvido de bateria (scripts/instalar_ouvido.sh): a batida das músicas novas será estimada na música inteira")
+		log.Printf("aviso: sem o ouvido de bateria (%s): a batida das músicas novas será estimada na música inteira", earInstaller())
 	}
 	if importer.APIKey == "" {
 		log.Print("aviso: sem OPENROUTER_API_KEY (.env ou ambiente): músicas novas serão analisadas só por regras")
@@ -202,7 +217,7 @@ func printURLs(port int, token string) {
 	if token != "" {
 		q = "/?t=" + token
 	}
-	fmt.Printf("Interface web:\n  http://localhost:%d%s\n", port, q)
+	fmt.Printf("Servidor HTTP no ar. Abra a interface no navegador:\n  http://localhost:%d%s\n", port, q)
 	ifaces, _ := net.Interfaces()
 	for _, ifc := range ifaces {
 		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 {
@@ -251,4 +266,21 @@ func dmxFormatter(rig *fixture.Rig) func(*dmx.Frame) string {
 		}
 		return strings.TrimRight(b.String(), " ")
 	}
+}
+
+// describeRig resume os canhões para o terminal: "esquerda d001, centro d008…".
+func describeRig(rig *fixture.Rig) string {
+	parts := make([]string, len(rig.Fixtures))
+	for i, f := range rig.Fixtures {
+		parts[i] = fmt.Sprintf("%s d%03d", f.Name, f.Address)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// earInstaller é o instalador do ouvido de bateria neste sistema.
+func earInstaller() string {
+	if runtime.GOOS == "windows" {
+		return `scripts\instalar_ouvido.ps1`
+	}
+	return "scripts/instalar_ouvido.sh"
 }
