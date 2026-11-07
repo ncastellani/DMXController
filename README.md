@@ -1,28 +1,59 @@
-# DMXController — luz automática para show com DMX
+# DMXController
 
-Programa em Go que comanda 3 canhões LED por DMX no pequeno show de um cantor
-(voz ao vivo sobre playback). Ele toca as faixas, gera uma **timeline de luz**
-para cada música (análise do áudio, com IA opcional), faz a luz seguir a
-música em sincronia e oferece os **presets manuais** do iluminador (modos de
-pista, cores, fritação, strobo, blackout) numa interface web usada no iPad e
-no computador ao mesmo tempo.
+**Luz automática para show ao vivo**: toca as músicas, cria uma "timeline de
+luz" para cada uma a partir do áudio (com IA opcional) e comanda os canhões
+LED por DMX em sincronia, com um console de presets que abre no iPad e no
+computador ao mesmo tempo.
 
-É um binário só e **não tem interface no terminal**: ele imprime os endereços
-e todo o controle e o log ficam na página. Foi desenvolvido e testado no
-Ubuntu; no show vai rodar num **Raspberry Pi 5 de 4 GB** (o plano anterior era
-o MacBook Pro M2 de Amós). Nada foi testado ainda no Pi nem no Mac.
+[![CI](https://github.com/ncastellani/DMXController/actions/workflows/ci.yml/badge.svg)](https://github.com/ncastellani/DMXController/actions/workflows/ci.yml)
+[![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
+[![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
 
-Este README é a documentação inteira do projeto: uso, formatos, protocolo,
-arquitetura, regras e estado atual. O único outro documento é o
-[design/brief.md](design/brief.md), um briefing antigo para o Claude Design
-(fora de uso). O `CLAUDE.md` só importa este arquivo para o Claude Code.
+![Aba Show: player com as partes da música, curva de energia e fritações (⚡); no topo, a cor de cada canhão agora](docs/img/show.png)
+
+Feito em Go para o pequeno show de um cantor (voz ao vivo sobre playback, 3
+canhões LED RGB). É um binário só e **não tem interface no terminal**: ele
+imprime os endereços da página, e todo o controle e o log ficam nela. Foi
+desenvolvido e testado no Linux (Ubuntu); no show vai rodar num **Raspberry
+Pi 5**.
+
+**Experimente sem instalar nada**: a [demonstração online](https://ncastellani.github.io/DMXController/)
+é a mesma interface com dados de exemplo (sem som e sem DMX).
+
+> [!WARNING]
+> O programa comanda **strobo** (luz piscando). Ele tem limites de tempo e de
+> frequência pensados para pessoas com fotossensibilidade (ver
+> [Segurança](#segurança-fotossensibilidade)), mas quem opera a luz continua
+> responsável pelo que acontece no palco.
+
+> **In English:** DMXController is a Go program that plays a show's backing
+> tracks, analyses each song (beats, sections, drums; optionally with an LLM via
+> OpenRouter) to generate a light timeline, and drives DMX LED fixtures in sync
+> through an Enttec Open DMX-compatible USB interface. A web UI (tablet and
+> desktop) offers a live preset console, a 2D preview and a timeline editor.
+> Code, UI and docs are in Brazilian Portuguese. Try the
+> [online demo](https://ncastellani.github.io/DMXController/).
+
+Este README é a documentação inteira do projeto: primeiro o manual de uso,
+depois a referência técnica (formatos, protocolo, arquitetura) e as notas de
+desenvolvimento.
 
 ## Índice
 
 - [O que o programa faz](#o-que-o-programa-faz)
-- [Hardware](#hardware)
+- [Do que você precisa](#do-que-você-precisa)
 - [Instalação](#instalação)
-- [Uso](#uso)
+- [Manual de uso](#manual-de-uso)
+  - [Primeiro contato, sem equipamento](#primeiro-contato-sem-equipamento)
+  - [Ligar o equipamento](#ligar-o-equipamento)
+  - [Adaptar a outros canhões](#adaptar-a-outros-canhões)
+  - [Preparar as músicas](#preparar-as-músicas)
+  - [Montar a setlist](#montar-a-setlist)
+  - [Som e atraso](#som-e-atraso)
+  - [Durante o show](#durante-o-show)
+  - [Rede e acesso](#rede-e-acesso)
+  - [Linha de comando](#linha-de-comando)
+  - [Problemas comuns](#problemas-comuns)
 - [Segurança (fotossensibilidade)](#segurança-fotossensibilidade)
 - [Arquivos e configuração](#arquivos-e-configuração)
 - [Biblioteca de presets](#biblioteca-de-presets)
@@ -30,10 +61,11 @@ arquitetura, regras e estado atual. O único outro documento é o
 - [Formato da timeline](#formato-da-timeline)
 - [Protocolo da interface web](#protocolo-da-interface-web)
 - [Arquitetura](#arquitetura)
-- [Regras e decisões](#regras-e-decisões)
 - [Desenvolvimento](#desenvolvimento)
+- [Regras e decisões](#regras-e-decisões)
 - [Estado atual e próximos passos](#estado-atual-e-próximos-passos)
 - [Histórico](#histórico)
+- [Licença](#licença)
 
 ## O que o programa faz
 
@@ -95,8 +127,8 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
   ou de aba, ao esconder a página ou se o aparelho para de responder por
   2 s. Não liga com a música do show tocando. Um aparelho por vez: o último
   que ligou conduz. Presets manuais ficam por cima, e o blackout apaga.
-- **PARAR TUDO** (luz manual, blackout **e a música**) e **BLACKOUT** sempre
-  à mão.
+- **PARAR TUDO** (luz manual, blackout, **a música** e a prévia nos canhões)
+  e **BLACKOUT** sempre à mão.
 - **Manual**: um controle por canal de cada canhão, para testar a interface
   DMX e descobrir canais.
 - **Posições**: troca de posição dos canhões no palco e "Identificar"
@@ -107,20 +139,35 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
 - **Eventos**: log do que aconteceu.
 - A interface DMX pode cair e voltar: o programa reconecta sozinho, e os
   alertas aparecem numa barra no topo da página.
+- **Tema escuro** por padrão (para operar no escuro), com opção de tema
+  claro. A página se ajusta ao computador, ao iPad e ao celular.
 
-## Hardware
+| Prévia e editor (aba Músicas) | Console | No celular |
+|---|---|---|
+| ![Aba Músicas: lista de músicas, palco 2D com os 3 canhões e "Ver nos canhões" ligado, barra da música e faixa de cores de cada canhão](docs/img/musicas.png) | ![Aba Console: botões dos modos de pista e das cores fixas, com o CLUB ligado](docs/img/console.png) | ![Aba Show no celular](docs/img/celular.png) |
 
-| Peça | Detalhes |
-|---|---|
-| Interface DMX | SourLight SL1000 = Enttec Open DMX (FTDI FT232R `0403:6001`, serial `A77AE62U`). Sem microcontrolador: o computador gera o sinal DMX (BREAK, MAB, start code e 512 canais a 250 kbaud 8N2, ~28 quadros/s) |
-| Canhões | 3× Mini Men MM-T114 em modo 7 canais, endereços **d001, d008, d015** (esquerda, centro, direita) |
-| Som | Caixa Mondial CM-400 por Bluetooth ou cabo P2 (decide na hora) |
+## Do que você precisa
 
+| Peça | O que serve | Usado no desenvolvimento |
+|---|---|---|
+| Computador | Linux (PC ou Raspberry Pi de 64 bits) ou macOS (**não testado**). Windows não é suportado | Ubuntu; no show, Raspberry Pi 5 de 4 GB |
+| Interface DMX | USB do tipo **Enttec Open DMX**: chip FTDI, sem microcontrolador | SourLight SL1000 (FTDI FT232R `0403:6001`) |
+| Canhões | aparelhos LED RGB com DMX. O programa foi pensado para **3** (esquerda, centro, direita) | 3× Mini Men MM-T114 em modo 7 canais, endereços **d001, d008, d015** |
+| Som | qualquer saída do sistema: cabo, Bluetooth, HDMI, placa USB | caixa Mondial CM-400 por Bluetooth ou cabo P2 |
+| Controle | navegador na mesma rede (iPad, celular, computador), quantos quiser ao mesmo tempo | iPad e o próprio computador |
+| Internet | só para a análise com IA e para instalar o ouvido de bateria | — |
+
+- **Interfaces "Pro"** (Enttec DMX USB Pro e parecidas, com microcontrolador
+  e protocolo próprio), Art-Net e sACN **não são suportadas**. Numa Open DMX
+  o computador gera o sinal DMX sozinho (BREAK, MAB, start code e 512 canais
+  a 250 kbaud 8N2, ~28 quadros/s).
+- **Só um programa por vez** pode usar a interface DMX: se o QLC+ (ou outro
+  programa de luz) estiver aberto, feche antes.
 - **Canais do MM-T114** (modo 7 canais): `1 dimmer | 2 R | 3 G | 4 B | 5 vazio
-  | 6 função | 7 velocidade`. **Canal 6 = 50 + canal 7 alto = strobo nativo**
-  (descoberto por Amós). Fora do strobo, os canais 5 a 7 ficam em 0.
-- **Só um programa por vez** pode usar a interface DMX: se o QLC+ estiver
-  aberto, feche antes.
+  | 6 função | 7 velocidade`. **Canal 6 = 50 + canal 7 alto = strobo
+  nativo** (descoberto por Amós Junior). Fora do strobo, os canais 5 a 7
+  ficam em 0. Para outros
+  aparelhos, veja [Adaptar a outros canhões](#adaptar-a-outros-canhões).
 - **Linux**: `termios2`/BOTHER + `TIOCSBRK`; os ioctls repetem em `EINTR`.
   **macOS**: `IOSSIOSPEED` + `TIOCDRAIN`, porta `/dev/cu.usbserial-*` (**não
   testado**). `-dev auto` detecta a porta nos dois.
@@ -132,11 +179,36 @@ A página tem duas abas de show (**Show** e **Console**) e cinco de preparação
 
 ## Instalação
 
+### Programa pronto
+
+Na página de [releases](https://github.com/ncastellani/DMXController/releases),
+baixe o pacote da sua plataforma:
+
+| Plataforma | Pacote |
+|---|---|
+| PC com Linux | `DMXController-<versão>-linux-amd64.tar.gz` |
+| Raspberry Pi (sistema de 64 bits) | `DMXController-<versão>-linux-arm64.tar.gz` |
+| Mac com Apple Silicon (M1, M2…) | `DMXController-<versão>-darwin-arm64.tar.gz` |
+| Mac com Intel | `DMXController-<versão>-darwin-amd64.tar.gz` |
+
+```bash
+tar -xzf DMXController-v1.0.0-linux-arm64.tar.gz
+cd DMXController
+./DMXController -dev mock          # primeiro teste, sem interface DMX
+```
+
+O pacote traz o binário, a configuração (`config/`), o `.env.example`, o
+script do ouvido de bateria, este README e a licença. O `SHA256SUMS` da
+release confere os downloads (`sha256sum -c SHA256SUMS --ignore-missing`).
+
+### Compilar a partir do código
+
 Precisa do Go 1.26 ou mais novo.
 
 ```bash
+git clone https://github.com/ncastellani/DMXController.git
+cd DMXController
 go build -o bin/ .                         # gera bin/DMXController
-cp .env.example .env                       # opcional: chave do OpenRouter para a IA
 ```
 
 Outras plataformas (compila sem cgo):
@@ -146,18 +218,48 @@ GOOS=linux  GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .    # Raspb
 GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o bin/darwin-arm64/ .   # Mac M1/M2
 ```
 
-**Linux (Ubuntu, Raspberry Pi OS)**: dê permissão da porta ao usuário.
+Nos exemplos deste manual, `./DMXController` é o binário: no pacote pronto
+ele fica na raiz; se você compilou, é `./bin/DMXController`. Rode sempre **de
+dentro da pasta do programa**: os caminhos padrão (`config/`, `musicas/`,
+`.env`, `.ouvido/`) são relativos à pasta atual.
+
+### Linux: permissão da porta
+
+Dê ao seu usuário acesso à interface DMX (uma vez só; não use `sudo` para
+rodar o programa):
 
 ```bash
 echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-sl1000.rules
 sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=tty
 ```
 
-O controle de som e Bluetooth usa `wpctl`, `pw-dump` (PipeWire) e
-`bluetoothctl`.
+`0403:6001` é o FT232R da SL1000 e de muitos clones da Open DMX. Confira o da
+sua interface com `lsusb` e troque na regra se for outro.
 
-**macOS** (ainda não testado): `brew install blueutil switchaudio-osx`. Se o
-sistema bloquear o binário, rode `xattr -d com.apple.quarantine bin/darwin-arm64/*`.
+O controle de som e Bluetooth usa `wpctl`, `pw-dump` (PipeWire) e
+`bluetoothctl`, que já vêm no Ubuntu e no Raspberry Pi OS com desktop.
+
+### macOS (ainda não testado)
+
+```bash
+brew install blueutil switchaudio-osx
+```
+
+Se o sistema bloquear o binário, rode `xattr -d com.apple.quarantine DMXController`
+(ou `bin/darwin-arm64/*`, se compilou).
+
+### IA (opcional)
+
+A análise com IA usa o [OpenRouter](https://openrouter.ai). Crie uma chave
+lá e coloque no `.env`:
+
+```bash
+cp .env.example .env                       # e preencha OPENROUTER_API_KEY
+```
+
+A variável de ambiente `OPENROUTER_API_KEY` também vale. Sem a chave, a
+análise usa só regras, e o resto do programa funciona igual. Uma música
+custa cerca de US$ 0,02 a 0,03.
 
 ### Ouvido de bateria (opcional)
 
@@ -181,14 +283,261 @@ pelo conteúdo do áudio), então analisar a mesma música de novo é imediato.
 Sem ele o programa funciona igual e estima a batida na música inteira. A aba
 Músicas diz se o ouvido está ligado.
 
-## Uso
+## Manual de uso
+
+### Primeiro contato, sem equipamento
 
 ```bash
-./bin/DMXController                 # abre a interface em http://<ip>:8080 (o terminal mostra os endereços)
-./bin/DMXController -dev mock       # sem interface DMX: só a prévia na tela
+./DMXController -dev mock
 ```
 
-Ctrl+C apaga os canhões e encerra.
+O terminal mostra os endereços da interface (ex.: `http://localhost:8080` e
+`http://192.168.0.10:8080`). Abra o primeiro no navegador do computador ou o
+segundo no iPad ou no celular, conectado à mesma rede Wi-Fi. Todos os
+aparelhos abertos veem e comandam o mesmo show ao mesmo tempo.
+
+Com `-dev mock` nada vai para a interface DMX, mas todo o resto funciona:
+enviar e analisar músicas, ver a prévia, montar a setlist, tocar e apertar
+os botões do console. Os 3 círculos no topo da página mostram a cor que cada
+canhão estaria emitindo.
+
+Para encerrar, aperte Ctrl+C no terminal: o programa apaga os canhões antes
+de sair.
+
+### Ligar o equipamento
+
+1. **Enderece os canhões** no display de cada um, no modo de canais do
+   perfil (no MM-T114: modo 7 canais, `d001`, `d008` e `d015`). Os endereços
+   têm de bater com `config/patch.yaml`.
+2. **Ligue a interface USB** e o cabo DMX: interface → canhão → canhão. Um
+   terminador no último ajuda em cabos longos.
+3. No Linux, faça a [regra udev](#linux-permissão-da-porta) (uma vez).
+4. **Rode sem `-dev`**: `./DMXController`. Ele encontra a interface sozinho
+   (`-dev auto`). Se houver mais de uma porta serial, escolha com
+   `-dev /dev/ttyUSB0` (Linux) ou `-dev /dev/cu.usbserial-XXXX` (Mac). Sem a
+   interface, o programa continua funcionando, avisa na barra do topo e
+   tenta de novo a cada segundo.
+5. Na aba **Posições**, use **Identificar** (acende um canhão por 3 s) para
+   conferir quem é a esquerda, o centro e a direita. Se estiverem trocados,
+   troque as posições ali mesmo: o programa grava em `config/patch.yaml`.
+6. A aba **Manual** tem um controle por canal de cada canhão: serve para
+   testar a interface e descobrir os canais de um aparelho novo. Soltar os
+   controles devolve a luz ao programa.
+
+### Adaptar a outros canhões
+
+Tudo o que depende do equipamento está em dois arquivos YAML: nenhum
+endereço fica no código.
+
+**`config/fixtures.yaml`** descreve cada modelo de aparelho (perfil): a
+função de cada canal, na ordem, a partir do endereço inicial.
+
+| Função | O que o programa põe no canal |
+|---|---|
+| `dimmer` | a intensidade (0–255). Sem canal de dimmer, a intensidade é aplicada direto nas cores |
+| `red`, `green`, `blue` | a cor |
+| `white` | o valor fixo de `fixed` (o programa mistura só R, G e B) |
+| `mode` | o valor de `fixed`; com strobo ligado, o de `strobe_mode` |
+| `speed` | o valor de `fixed`; com strobo ligado, a velocidade do preset |
+| `empty` | o valor de `fixed` (em geral 0) |
+
+`strobe_mode` é o valor do canal `mode` que liga o strobo nativo do aparelho
+(no MM-T114, 50). Com `0`, o aparelho não pisca: fritações e strobos acendem
+a cor, parada.
+
+**`config/patch.yaml`** lista os canhões **na ordem do palco** (esquerda →
+direita), cada um com nome, perfil e endereço inicial (o do display).
+
+Exemplo com dois aparelhos genéricos (testado no modo mock):
+
+```yaml
+# config/fixtures.yaml
+profiles:
+  par-rgb-3ch:
+    name: PAR LED RGB genérico (3 canais)
+    channels: [red, green, blue]   # sem dimmer: a intensidade vai direto nas cores
+  par-rgbw-8ch:
+    name: PAR LED RGBW (8 canais)
+    channels: [dimmer, red, green, blue, white, mode, speed, empty]
+    fixed: {white: 0, mode: 0, speed: 0}
+    strobe_mode: 0                 # 0 = o aparelho não tem strobo nativo
+```
+
+```yaml
+# config/patch.yaml
+fixtures:
+  - {name: esquerda, profile: par-rgbw-8ch, address: 1}
+  - {name: centro,   profile: par-rgb-3ch,  address: 9}
+  - {name: direita,  profile: par-rgbw-8ch, address: 12}
+```
+
+- O programa confere os arquivos ao iniciar: função de canal desconhecida,
+  perfil que não existe, canhões que se sobrepõem ou que passam do canal 512
+  impedem a partida, com o motivo.
+- **Quantidade de canhões**: os presets e a análise foram escritos para 3
+  (cada passo tem os tons de esquerda, centro e direita). Com outro número,
+  o DMX funciona (os tons se repetem em ciclo: o 4º canhão faz o mesmo que
+  o 1º), mas isso não foi testado no palco.
+- **Trocar posições** pela aba Posições só funciona entre canhões com o
+  mesmo número de canais.
+- Os botões do console ficam em `config/console.yaml` e os presets em
+  `config/biblioteca.yaml` (ver [Biblioteca de presets](#biblioteca-de-presets)).
+  Ao mudar qualquer YAML, reinicie o programa.
+
+### Preparar as músicas
+
+Tudo isso acontece na aba **Músicas**, em casa, antes do show (a IA precisa
+de internet).
+
+1. **Envie as faixas** com **+ Enviar .wav**. O programa lê WAV PCM (8, 16,
+   24 ou 32 bits, ou float), em qualquer taxa e número de canais. Outros
+   formatos: converta antes (ex.: `ffmpeg -i musica.mp3 musica.wav`).
+2. **Escolha como analisar**:
+   - **IA** (aparece com a chave do OpenRouter): a IA ouve a música e escolhe
+     a luz de cada parte. Sem ela, valem as regras.
+   - **Cores**: automáticas, só quentes ou só frias.
+   - **Efeitos**: Presets, Livre ou Misto (ver
+     [O que o programa faz](#o-que-o-programa-faz)).
+3. A **fila de análise** mostra cada etapa (ler o áudio, separar a bateria,
+   analisar batidas e partes, ouvir com a IA). Sem IA e sem ouvido, leva
+   segundos; com os dois, cerca de 1 minuto num computador comum. Quando
+   termina, a música entra na setlist.
+4. **Confira a luz na prévia**: toque numa música da lista. À direita
+   aparecem o **palco 2D** (vistas "Pendurados" e "No chão") e, sob a barra
+   da música, a **faixa de cores** de cada canhão. O som sai no aparelho em
+   que você está (não na caixa do show) e os canhões só acendem com **Ver nos
+   canhões** (passo 6).
+   - Listrado na faixa = strobo ou troca rápida de cor; ⚡ = fritação.
+   - "Piscar strobo e fritação" faz o palco 2D piscar de verdade (no máximo
+     2,9 vezes por segundo). Vem desligado se o aparelho pede menos
+     movimento.
+5. **Ajuste no editor**, logo abaixo. "+ Luz aqui", "+ Fritação aqui" e "+
+   Apagar aqui" criam uma troca no ponto atual da prévia, encaixada na
+   batida; "Aqui" leva a prévia até uma troca e "Selecionar" move a troca
+   para o ponto atual. Cada troca de luz pode mudar de preset, virar uma cor
+   nova ("Nova cor…"), um efeito livre ("Novo efeito livre…") ou o desenho
+   de um modo de pista ("MODOS DE PISTA COMO EFEITO"), e "Trocar por um
+   preset…" desfaz. Num efeito, dá para mudar a cor de cada canhão em cada
+   passo, o tempo do passo e o fade. Os apagões aceitam fade, e as partes
+   podem ser renomeadas ("Nomes das partes"). As mudanças **são salvas
+   sozinhas** e valem na hora, mesmo com a música tocando no show;
+   "Desfazer" volta um passo e "Restaurar gerada", à versão da análise.
+6. **Ver nos canhões** leva a prévia à luz de verdade: os canhões seguem a
+   prévia (tocando, pausada ou pulando na barra) e cada ajuste aparece neles
+   em menos de 1 s. O som continua saindo no aparelho da prévia, e o atraso
+   dele não é compensado (com fone Bluetooth, a luz pode vir um pouco antes
+   do som). Desliga sozinho ao trocar de música ou de aba, ao esconder a
+   página, com PARAR TUDO ou quando o show começa a tocar; com a música do
+   show tocando, não liga. Um aparelho por vez: o último que ligou conduz.
+7. **Analisar de novo…** refaz a timeline (as edições à mão se perdem; o
+   programa pede confirmação). **Remover…** tira a música da setlist e leva
+   os arquivos para `musicas/lixeira/`.
+
+Cada música fica em `musicas/` como `X.wav` + `X.json` (a timeline). **Faça
+backup dessa pasta**: as edições à mão só existem ali.
+
+Para analisar uma pasta inteira de uma vez, sem abrir a página, use o
+subcomando [`analisar`](#analisar-uma-pasta-inteira-analisar).
+
+### Montar a setlist
+
+Na aba **Show**:
+
+- **Ordem**: arraste as músicas pela alça ⠿.
+- **Emendas**: entre duas músicas, "⤓ emendar com a próxima" faz a seguinte
+  entrar sozinha, depois do intervalo escolhido (− / +; 0 = sem nenhum
+  corte).
+- **Carregar**: tocar numa música carrega no player, parada no início (se
+  outra estiver tocando, a página pede confirmação).
+- **Player**: tocar / pausar / parar, barra com as partes (coloridas pela
+  energia), as trocas de luz e as fritações ⚡; tocar na barra ou na régua de
+  tempo pula; volume.
+- **Luz da música**: a lista das trocas de luz rola junto com a música. "Aqui"
+  leva o show até uma troca; "Editar" abre o editor na aba Músicas.
+
+A ordem e as emendas ficam gravadas em `musicas/setlist.txt`.
+
+### Som e atraso
+
+Na aba **Som**:
+
+1. **Saída**: escolha por onde o som sai (Bluetooth, cabo, HDMI…). A troca
+   vale para o sistema todo.
+2. **Caixa Bluetooth**: "Procurar" (~12 s), parear e conectar. A caixa
+   escolhida vira a preferida e o programa a reconecta sozinho se ela cair.
+3. **Calibre o atraso** ("Calibrar"): a caixa toca cliques e os canhões
+   piscam em branco a cada clique (no máximo 3 vezes por segundo). Ajuste o
+   atraso até a piscada cair junto com o clique que você ouve. Bluetooth
+   costuma pedir 150 a 300 ms; o valor pode ser negativo (o som sai antes da
+   luz). Fica salvo em `config/som-<sistema>.yaml`.
+
+No Mac, a troca de saída e o Bluetooth precisam do `blueutil` e do
+`switchaudio-osx` (a aba avisa se faltarem).
+
+### Durante o show
+
+![Aba Console no iPad, com o modo de pista CLUB ligado](docs/img/console.png)
+
+- **A luz fica apagada** até a música tocar ou um preset ser ligado à mão.
+  Com a música tocando, a luz segue a timeline dela.
+- **Console**: os modos de pista e as cores fixas dividem a mesma camada (um
+  por vez; apertar de novo apaga). A **fritação** só fica acesa enquanto o
+  dedo está no botão (no máximo 10 s). O **strobo contínuo** liga e desliga
+  no próprio botão (no máximo 60 s; a tecla `b` também desliga).
+- **O que fica por cima**: timeline < modo de pista ou cor < strobo <
+  fritação. Ao desligar um preset manual, a timeline volta.
+- **BLACKOUT** (espaço) apaga tudo enquanto estiver ligado, sem parar a
+  música. **PARAR TUDO** (Esc) desliga a luz manual, o blackout, **a
+  música** e a prévia nos canhões.
+- O iPad e o computador podem ficar abertos ao mesmo tempo: o que um aperta,
+  o outro vê. Se a página perder a conexão, ela reconecta sozinha; se perder
+  o foco, solta as fritações seguradas.
+- Se o cabo DMX ou a caixa caírem, um alerta aparece no topo da página e o
+  programa tenta reconectar.
+
+**Atalhos de teclado** (no computador):
+
+| Tecla | Efeito |
+|---|---|
+| espaço | blackout (liga/desliga) |
+| Esc | PARAR TUDO |
+| `b` | desliga o strobo contínuo (não há botão para isso na tela) |
+| as teclas de `key` em `config/console.yaml` | o botão correspondente (a fritação fica acesa enquanto a tecla está apertada) |
+
+Resumo do dia do show:
+
+1. Em casa: músicas analisadas e conferidas na prévia, setlist na ordem,
+   emendas marcadas, backup de `musicas/`.
+2. No local: canhões endereçados, interface e caixa ligadas,
+   `./DMXController`, página aberta no iPad.
+3. **Posições** → Identificar; **Som** → saída e calibração do atraso.
+4. **Show**: carregar a primeira música e tocar. O **Console** fica numa aba
+   ao lado para os momentos à mão.
+
+### Rede e acesso
+
+- Por padrão, **qualquer aparelho na mesma rede** consegue abrir a página e
+  comandar a luz e o som. Numa rede compartilhada (o Wi-Fi do local), use
+  uma senha:
+
+  ```bash
+  ./DMXController -token minha-senha
+  ```
+
+  A página só abre com `?t=minha-senha` no endereço na primeira vez (depois
+  fica num cookie). O terminal já mostra os endereços com o token.
+- `-web 127.0.0.1:8080` deixa a página só no próprio computador; `-web :9000`
+  troca a porta.
+- O programa não precisa de internet durante o show. Uma opção é o próprio
+  computador (ou o Raspberry Pi) criar uma rede Wi-Fi para o iPad, sem
+  depender da rede do local.
+
+### Linha de comando
+
+```bash
+./DMXController                 # abre a interface em http://<ip>:8080 (o terminal mostra os endereços)
+./DMXController -dev mock       # sem interface DMX: só a prévia na tela
+```
 
 | Opção | Padrão | Para quê |
 |---|---|---|
@@ -204,34 +553,10 @@ Ctrl+C apaga os canhões e encerra.
 | `-patch` | `config/patch.yaml` | posições e endereços dos canhões |
 | `-som` | `config/som-<sistema>.yaml` | preferências de som |
 
-### Preparar o show
-
-1. Na aba **Músicas**, envie os `.wav` e analise. Toque em cada música e
-   confira a luz na prévia (o som sai no computador ou iPad, não na caixa),
-   ajustando no editor. Com **Ver nos canhões**, a prévia acende os canhões
-   de verdade e cada ajuste aparece neles na hora.
-2. Em **Posições**, confirme a ordem dos canhões com "Identificar".
-3. Em **Som**, escolha a saída e calibre o atraso: os canhões piscam em
-   branco a cada clique; ajuste até a piscada cair junto com o clique que
-   você ouve (Bluetooth costuma pedir 150 a 300 ms).
-4. Na aba **Show**, arraste as músicas para a ordem do show e marque as
-   emendas.
-
-A análise com IA precisa de internet: faça em casa, antes do show.
-
-### Atalhos de teclado
-
-| Tecla | Efeito |
-|---|---|
-| espaço | blackout (liga/desliga) |
-| Esc | PARAR TUDO |
-| `b` | desliga o strobo contínuo (não há botão para isso na tela) |
-| as teclas de `key` em `config/console.yaml` | o botão correspondente (a fritação fica acesa enquanto a tecla está apertada) |
-
-### Analisar uma pasta inteira (`analisar`)
+#### Analisar uma pasta inteira (`analisar`)
 
 ```bash
-./bin/DMXController analisar musicas/      # gera X.json para cada X.wav
+./DMXController analisar musicas/      # gera X.json para cada X.wav
 ```
 
 | Opção | Efeito |
@@ -245,17 +570,36 @@ A análise com IA precisa de internet: faça em casa, antes do show.
 | `-ouvido <pasta>` | pasta do ouvido de bateria (padrão `.ouvido`) |
 | `-modelo`, `-console`, `-profiles`, `-patch` | como no servidor |
 
-### Clima dos modos de pista (`biblioteca`)
+#### Clima dos modos de pista (`biblioteca`)
 
 Depois de criar ou mudar um modo de pista na biblioteca, peça à IA o clima
 dele (é o que o modo livre usa para escolher):
 
 ```bash
-./bin/DMXController biblioteca             # avalia os que ainda não têm clima
+./DMXController biblioteca             # avalia os que ainda não têm clima
 ```
 
 `-reavaliar` refaz todos, `-arquivo` aponta para outro arquivo de biblioteca
 (padrão `config/biblioteca.yaml`) e `-modelo` troca o modelo.
+
+### Problemas comuns
+
+| O que acontece | O que fazer |
+|---|---|
+| "nenhuma interface DMX (FTDI) encontrada" | confira o cabo USB e, no Linux, a [regra udev](#linux-permissão-da-porta). Feche o QLC+ ou outro programa de luz. Para ensaiar sem interface, use `-dev mock` |
+| "mais de uma porta serial encontrada" | escolha a porta com `-dev /dev/ttyUSB0` (ou `/dev/serial/by-id/…`) |
+| "permission denied" na porta | falta a regra udev; não use `sudo` |
+| "interface web: … já está aberto em outro terminal?" | o programa já está rodando, ou a porta 8080 está ocupada: feche o outro ou use `-web :8081` |
+| A música carregou, mas a luz não acende | é o padrão: a timeline só acende com a música **tocando** |
+| "Ver nos canhões" não liga ou desliga sozinho | o show tem prioridade: com a música do show tocando, a prévia não vai aos canhões. Também desliga ao trocar de aba ou esconder a página |
+| A luz chega antes ou depois do som | calibre o atraso na aba Som (Bluetooth costuma pedir 150 a 300 ms) |
+| O som sai no HDMI e ignora a saída escolhida | o programa está rodando como root: rode sem `sudo` |
+| O strobo não pisca | o valor de `strobe_mode` no perfil não é o do seu aparelho. No MM-T114, 50 fica na fronteira das faixas do canal de função: teste 60 a 70 |
+| A fritação apaga sozinha | é o limite de segurança (10 s; strobo contínuo, 60 s), em `limits` de `config/console.yaml` |
+| "sem OPENROUTER_API_KEY" no terminal | sem a chave as músicas são analisadas só por regras; ver [IA](#ia-opcional) |
+| "sem o ouvido de bateria" no terminal | é opcional; ver [Ouvido de bateria](#ouvido-de-bateria-opcional) |
+| O programa não inicia e aponta um YAML | a mensagem diz o arquivo e o motivo (preset inexistente, canal desconhecido, endereços sobrepostos…) |
+| O Mac bloqueia o binário | `xattr -d com.apple.quarantine DMXController` |
 
 ## Segurança (fotossensibilidade)
 
@@ -305,7 +649,10 @@ dele (é o que o modo livre usa para escolher):
 | `.env` | `OPENROUTER_API_KEY` (modelo em `.env.example`) | não |
 | `.ouvido/` | o ouvido de bateria instalado: Python próprio, Demucs, modelo e as baterias já separadas | não |
 | `scripts/` | `instalar_ouvido.sh` (ouvido de bateria), `cdp.mjs` (teste da interface no Chrome), `kit_design.py` (kit do Claude Design, fora de uso) | sim |
+| `docs/img/` | as imagens deste README (prints do modo demonstração) | sim |
+| `.github/workflows/` | CI, releases e a demonstração no GitHub Pages (ver [Desenvolvimento](#desenvolvimento)) | sim |
 | `design/` | `brief.md` e o kit gerado do Claude Design (fora de uso) | só o `brief.md` |
+| `LICENSE` | licença MIT | sim |
 | `tmp/` | sobras e testes locais | não |
 | `bin/` | binários compilados | não |
 
@@ -316,6 +663,8 @@ lá.
   (`flash`, `strobe`) e `groups`, cada grupo com `name`, `layer` (`base`,
   `strobe` ou `flash`) e `buttons` (`caption`, `preset`, `color`, `key`
   opcional).
+- **`config/fixtures.yaml`** e **`config/patch.yaml`**: ver
+  [Adaptar a outros canhões](#adaptar-a-outros-canhões).
 - **`musicas/setlist.txt`**: um `.json` por linha, na ordem do show;
   `X.json<TAB>emendar=<segundos>` emenda com a próxima depois desse
   intervalo. É gravado pela interface.
@@ -330,11 +679,11 @@ texto editável: **29 cores**, **11 strobos** (7 de fritação e 4 contínuos) e
 não inicia e diz o que está errado. Para criar ou mudar um preset, edite o
 arquivo (o formato também está explicado no topo dele) e reinicie.
 
-Ela nasceu do workspace do QLC+ montado por Amós. A conversão foi conferida
-antes de o `.qxw` ser apagado: os 72 presets geravam DMX idêntico ao do QLC+
-(604.892 quadros comparados, de 1 em 1 ms por dois ciclos). O programa não
-lê mais `.qxw`. Desde então, só o `pista:club` mudou (ver
-[Histórico](#histórico)).
+Ela nasceu do workspace do QLC+ que Amós Junior montou para o show. A
+conversão foi conferida antes de o `.qxw` sair do projeto: os 72 presets geravam DMX
+idêntico ao do QLC+ (604.892 quadros comparados, de 1 em 1 ms por dois
+ciclos). O programa não lê mais `.qxw`. Desde então, só o `pista:club` mudou
+(ver [Histórico](#histórico)).
 
 - **Tom**: `#rrggbb` (dimmer no máximo; `#000000` = apagado) ou `#rrggbb@180`
   (a cor com o dimmer em 180 de 255).
@@ -734,8 +1083,8 @@ servidor (para saber se é ele quem conduz a prévia nos canhões).
 - `active.*`: id do botão ativo na camada, `-1` = nenhum.
 - `positions`: na ordem do palco (esquerda → direita). `color` é a cor
   estimada que o canhão emite agora; `strobe` = strobo nativo ligado.
-- `channels[].role`: `dimmer red green blue empty mode speed`. `manual` =
-  canal fixado pelo controle manual.
+- `channels[].role`: `dimmer red green blue white empty mode speed`.
+  `manual` = canal fixado pelo controle manual.
 - `identify`: posição sendo identificada (acesa em branco), `-1` = nenhuma.
 - `show`: título da música cuja timeline está conduzindo a luz (`""` =
   nenhuma).
@@ -811,9 +1160,9 @@ pode ser negativo.
 
 ```json
 { "type": "sound", "available": true, "platform": "linux", "missing": [],
-  "outputs": [ { "id": "bluez_output...", "name": "MONDIAL CM", "kind": "bluetooth", "default": true } ],
-  "devices": [ { "address": "F3:E3:...", "name": "MONDIAL CM", "paired": true, "connected": true } ],
-  "speaker": "F3:E3:...", "busy": "", "warning": "", "error": "" }
+  "outputs": [ { "id": "bluez_output...", "name": "MINHA CAIXA", "kind": "bluetooth", "default": true } ],
+  "devices": [ { "address": "12:34:56:...", "name": "MINHA CAIXA", "paired": true, "connected": true } ],
+  "speaker": "12:34:56:...", "busy": "", "warning": "", "error": "" }
 ```
 
 - `kind`: `bluetooth`, `wired` (P2), `builtin`, `hdmi`, `other`.
@@ -984,9 +1333,9 @@ pacotes de `internal/`:
 - **`library`**: a biblioteca de presets (`config/biblioteca.yaml`): cores,
   strobos e modos de pista.
 - **`engine`**: camadas **Show (timeline da música) < Live (prévia nos
-  canhões) < Base < Strobe < Flash < Identify**, com os canais manuais por cima; o blackout zera tudo. A
-  camada mais alta define o quadro inteiro (no QLC+ era HTP e misturava
-  cores).
+  canhões) < Base < Strobe < Flash < Identify**, com os canais manuais por
+  cima; o blackout zera tudo. A camada mais alta define o quadro inteiro (no
+  QLC+ era HTP e misturava cores).
 - **`control`**: `Console` (os botões de `config/console.yaml`, cada um com
   o `preset` da biblioteca, e os `limits`) e `Controller`, thread-safe:
   toggle, solo, fritação segurada por "holder" com ping e TTL, manual,
@@ -1023,10 +1372,71 @@ pacotes de `internal/`:
 - **`web`**: HTML único embutido (`static/index.html`, JS puro), WebSocket
   `/ws` e as rotas HTTP do [protocolo](#protocolo-da-interface-web).
   `Importer` = envio e fila de análise; `Health` = alertas;
-  `static/demo.js` = modo demonstração (`?demo=1`, sem servidor).
+  `static/demo.js` = modo demonstração (`?demo=1` ou `<html data-demo>`,
+  sem servidor).
 
 **Locks**: o engine chama `source.Render` segurando o lock dele, então
 `Show` nunca chama o engine segurando `s.mu`. O playhead tem lock próprio.
+
+## Desenvolvimento
+
+```bash
+go build -o bin/ .                            # bin/DMXController
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .   # Raspberry Pi
+for a in arm64 amd64; do GOOS=darwin GOARCH=$a CGO_ENABLED=0 go build -o bin/darwin-$a/ .; done
+go test -race ./...
+gofmt -l .
+```
+
+- **Testes**: os que usam uma faixa real procuram
+  `musicas/praficarcomigo.wav` e `musicas/praficarcomigo.json` (fora do
+  repositório) e são pulados sem elas. O resto da suíte usa áudio sintético
+  e um Python de mentira para o ouvido de bateria, e roda em qualquer
+  máquina, sem interface DMX nem placa de som.
+- **Sempre funcionando**: o modo `-dev mock` e o modo demonstração da página
+  (`?demo=1`, sem servidor). Os dados de exemplo ficam em
+  `internal/web/static/demo.js`; a `config` dele é a mensagem real do
+  servidor, capturada com a configuração deste repositório.
+- **Interface num navegador de verdade**: Chrome headless do cache do
+  Playwright + `scripts/cdp.mjs` (o roteiro está no próprio arquivo). Os
+  prints de `docs/img/` saem do modo demonstração servido como site
+  estático, em 1440×900 (Show e Músicas), 1180×820 (Console) e 390×844
+  (celular).
+- **Nunca `pkill -f` com padrão que apareça no próprio comando** (mata o
+  shell); use `pkill -x DMXController` / `pkill -x chrome-headless`.
+- **Git**: ficam fora `musicas/`, `tmp/`, `.env`, `bin/`, `.ouvido/`,
+  `config/som-*.yaml` e o kit gerado do Claude Design (ver `.gitignore`).
+  Sobras e testes locais vão para `tmp/`.
+- **Documentação**: só este README. Ao mudar o programa, atualize a seção
+  correspondente e [Estado atual e próximos
+  passos](#estado-atual-e-próximos-passos), em vez de criar outro `.md`.
+- O workspace original do QLC+, de onde veio a biblioteca, não faz parte do
+  repositório.
+
+### GitHub: CI, versões e demonstração
+
+| Workflow | Quando roda | O que faz |
+|---|---|---|
+| `ci.yml` | cada push na `main` e cada pull request | `gofmt`, `go vet`, `go test -race` e a compilação para Linux (amd64, arm64) e Mac (arm64, amd64) |
+| `release.yml` | ao enviar uma tag `v*` | testes, compila as 4 plataformas e cria a release com um `.tar.gz` por plataforma (binário, `config/`, `.env.example`, script do ouvido, README e licença) e o `SHA256SUMS` |
+| `demo.yml` | push na `main` que mexe em `internal/web/static/`, ou à mão | publica o modo demonstração no GitHub Pages |
+
+- **Publicar uma versão**: `git tag v1.0.0 && git push origin v1.0.0`.
+- **Demonstração**: uma vez só, em Settings → Pages → Build and deployment,
+  escolha a fonte "GitHub Actions". O workflow copia `index.html` e
+  `demo.js` e marca `<html data-demo>`, para a página abrir sempre em modo
+  demonstração.
+
+### Contribuições
+
+Issues e pull requests são bem-vindos. Código, comentários, interface e
+documentação ficam em português do Brasil. Antes de mandar uma mudança:
+
+- rode `gofmt -l .` e `go test -race ./...`;
+- mantenha o modo `-dev mock` e o modo demonstração funcionando;
+- respeite as regras de [Segurança](#segurança-fotossensibilidade) (mudar
+  qualquer limite de strobo ou de piscada pede discussão antes);
+- atualize a seção correspondente deste README.
 
 ## Regras e decisões
 
@@ -1070,52 +1480,24 @@ pacotes de `internal/`:
 - **Configuração em YAML**, nada de endereços no código. Sempre manter o
   modo mock funcionando.
 - **Não rodar com `sudo`.**
-
-## Desenvolvimento
-
-```bash
-go build -o bin/ .                            # bin/DMXController
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/linux-arm64/ .   # Raspberry Pi
-for a in arm64 amd64; do GOOS=darwin GOARCH=$a CGO_ENABLED=0 go build -o bin/darwin-$a/ .; done
-go test -race ./...
-gofmt -l .
-```
-
-- **Testes**: os que usam uma faixa real procuram
-  `musicas/praficarcomigo.wav` e `musicas/praficarcomigo.json` e são pulados
-  sem elas (hoje a faixa tem outro nome na pasta, então estão sendo
-  pulados). O resto da suíte usa áudio sintético e um Python de mentira para
-  o ouvido de bateria.
-- **Sempre funcionando**: o modo `-dev mock` e o modo demonstração da página
-  (`?demo=1`, sem servidor).
-- **Interface num navegador de verdade**: Chrome headless do cache do
-  Playwright + `scripts/cdp.mjs` (o roteiro está no próprio arquivo).
-- **Nunca `pkill -f` com padrão que apareça no próprio comando** (mata o
-  shell); use `pkill -x DMXController` / `pkill -x chrome-headless`.
-- **Git**: ficam fora `musicas/`, `tmp/`, `.env`, `bin/`, `.ouvido/`,
-  `config/som-*.yaml` e o kit gerado do Claude Design (ver `.gitignore`).
-  Sobras e testes locais vão para `tmp/`.
-- **Documentação**: só este README. Ao mudar o programa, atualize a seção
-  correspondente e [Estado atual e próximos
-  passos](#estado-atual-e-próximos-passos), em vez de criar outro `.md`.
-- **Pacote original do QLC+** (HANDOVER.md, CSVs, `.qxw`): fora do repo, em
-  `~/Downloads/qlc/QLC_aniversario_pacote/`. O `.qxw` também está no
-  histórico do git, até o commit `3bf2395`.
+- **Repositório público** (desde 07/11/2026): nada de chaves, áudio das
+  músicas, endereços de aparelhos ou dados pessoais no repositório (nem em
+  testes e dados de exemplo). Nomes de pessoas só com autorização (Amós
+  Junior autorizou o crédito pelos presets).
 
 ## Estado atual e próximos passos
 
-Atualizado em 03/10/2026, depois da 8ª sessão de desenvolvimento.
+Atualizado em 07/11/2026, na preparação para publicar o repositório.
 
 Tudo o que este README descreve está pronto e foi testado no Linux: a suíte
 de testes passa, e as funções foram conferidas com a IA de verdade e pela
 página no Chrome headless (em tamanho de computador e de iPad).
 
-**Músicas na pasta**: Caso de Amor, Alinhamento Milenar, Doce e Pra Ficar
-Comigo, analisadas em 03/10/2026 no modo misto, com IA e com o ouvido de
-bateria. As versões anteriores (e as cópias de teste DoceAI e DoceSL) estão
-em `musicas/lixeira/`. A análise atual da Pra Ficar Comigo não tem nenhum
-pico (`accents` vazio), ou seja, nenhum flash branco: conferir se é o
-esperado.
+**Músicas do show** (fora do repositório, em `musicas/`): as quatro foram
+analisadas em 03/10/2026 no modo misto, com IA e com o ouvido de bateria. As
+versões anteriores e as cópias de teste estão em `musicas/lixeira/`. A
+análise atual da faixa de teste não tem nenhum pico (`accents` vazio), ou
+seja, nenhum flash branco: conferir se é o esperado.
 
 **Ouvido de bateria**: instalado na máquina de desenvolvimento (`.ouvido/`,
 1,2 GB). A separação leva de 40 a 53 s por música e usa 1,7 GB de memória.
@@ -1141,7 +1523,12 @@ esperado.
 - **Instalação do ouvido do zero** pelo script (ele foi rodado sobre a
   pasta já montada à mão com os mesmos comandos) e o ouvido **no Raspberry
   Pi** (tempo e memória).
-- **Modo demonstração**: `demo.js` ainda usa ids `qlc:` nos dados de exemplo.
+- **Workflows do GitHub** (CI, release e demonstração): os passos foram
+  rodados localmente com os mesmos comandos (pacotes das 4 plataformas,
+  primeira execução numa pasta limpa, site da demonstração no Chrome), mas
+  ainda não rodaram no GitHub.
+- **Outros canhões**: perfis sem dimmer e com canal branco foram conferidos
+  no modo mock (`-ver-dmx`), não em aparelhos de verdade.
 
 ### Pendências pequenas
 
@@ -1151,18 +1538,20 @@ esperado.
   BATIDÃO, CINEMA, IMPACTO e outros ainda têm blocos assim; só mexer se for
   pedido (o caminho é editar os passos na biblioteca). A intensidade
   (`level`) das partes calmas (0,5 a 0,6) também não mudou.
-- **Em aberto no equipamento** (do HANDOVER de Amós): o canal 6 em 50 está
-  na fronteira das faixas do canal de função (se o strobo parar, testar 60 a
-  70); canal 7 em 252 a 255 pode dar a mesma velocidade; as cores quentes
-  LARANJA QUEIMADO, FOGO, ÂMBAR ESCURO, ÂMBAR, ÂMBAR DOURADO e DOURADO talvez
-  não se distingam ao vivo; BORDÔ pode parecer vermelho; `PISTA | ÂMBAR 200`
-  troca 5 vezes por segundo.
+- **Em aberto no equipamento** (das anotações de Amós sobre o workspace): o
+  canal 6 em 50 está na fronteira das faixas do canal de função (se o strobo
+  parar, testar 60 a 70); canal 7 em 252 a 255 pode dar a mesma velocidade;
+  as cores quentes LARANJA QUEIMADO, FOGO, ÂMBAR ESCURO, ÂMBAR, ÂMBAR
+  DOURADO e DOURADO talvez não se distingam ao vivo; BORDÔ pode parecer
+  vermelho; `PISTA | ÂMBAR 200` troca 5 vezes por segundo.
 - **Por regras e com cores em "Automático"**, os presets podem misturar
   quentes e frios: escolher a temperatura resolve.
 - **Testes com faixa real** estão sendo pulados (procuram
   `musicas/praficarcomigo.*`).
 - **`design/brief.md`** está desatualizado (só importa se o Claude Design
   voltar).
+- **Mensagens do programa** ainda citam a SL1000 (ex.: "conecte a SL1000"),
+  o modelo de interface usado no desenvolvimento.
 
 ### Ideias aceitas, ainda não feitas
 
@@ -1290,3 +1679,17 @@ programa.
   (`darwin/arm64`).
 - **Entre a 5ª e a 7ª**: a calibração do atraso do som passou a aceitar
   valor negativo.
+- **Publicação (07/11/2026)** ("deixar público no GitHub, com manual no
+  README"): licença MIT; README reorganizado com o manual de uso
+  (equipamento, adaptar a outros canhões, rede, problemas comuns) e prints;
+  workflows de CI, releases e demonstração no GitHub Pages; dados de exemplo
+  da demonstração atualizados (ids da biblioteca, lista de modos de pista
+  como efeito, nome de faixa e endereço Bluetooth fictícios); endereço
+  Bluetooth e serial da interface retirados de testes e documentação;
+  crédito a Amós Junior pelos presets, com a autorização dele.
+
+## Licença
+
+[MIT](LICENSE). A biblioteca de presets (`config/biblioteca.yaml`) vem do
+workspace do QLC+ criado por **Amós Junior** para o show e é distribuída sob
+a mesma licença, com a autorização dele.

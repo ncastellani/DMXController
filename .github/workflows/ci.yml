@@ -1,0 +1,43 @@
+# Confere cada push e pull request: formatação, vet, testes e se o programa
+# compila para as plataformas do show (Raspberry Pi e Mac).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          fora=$(gofmt -l .)
+          if [ -n "$fora" ]; then
+            echo "arquivos fora do gofmt:"
+            echo "$fora"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Testes
+        run: go test -race ./...
+
+      - name: Compila para Linux, Raspberry Pi e Mac
+        run: |
+          for alvo in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
+            echo "== $alvo"
+            GOOS=${alvo%/*} GOARCH=${alvo#*/} CGO_ENABLED=0 go build -o /dev/null .
+          done

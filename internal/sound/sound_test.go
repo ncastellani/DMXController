@@ -41,7 +41,7 @@ func TestParseBTInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, audio := parseBTInfo("F3:E3:2F:9B:A2:B4", clean(data))
+	d, audio := parseBTInfo("12:34:56:78:9A:BC", clean(data))
 	if !audio || d.Name != "MONDIAL CM" || !d.Paired {
 		t.Fatalf("info: %+v audio=%v", d, audio)
 	}
@@ -53,16 +53,16 @@ func TestParseBTInfo(t *testing.T) {
 func TestParseMac(t *testing.T) {
 	sw := []byte(`{"name": "Alto-falantes do MacBook Pro", "type": "output", "id": "73", "uid": "BuiltInSpeakerDevice"}
 {"name": "Fones de ouvido externos", "type": "output", "id": "80", "uid": "BuiltInHeadphoneOutputDevice"}
-{"name": "MONDIAL CM", "type": "output", "id": "91", "uid": "F3-E3-2F-9B-A2-B4:output"}
+{"name": "MONDIAL CM", "type": "output", "id": "91", "uid": "12-34-56-78-9A-BC:output"}
 `)
 	devs := parseSwitchJSON(sw)
-	if len(devs) != 3 || devs[2].UID != "F3-E3-2F-9B-A2-B4:output" {
+	if len(devs) != 3 || devs[2].UID != "12-34-56-78-9A-BC:output" {
 		t.Fatalf("SwitchAudioSource: %+v", devs)
 	}
 	if kindOf(devs[0].Name) != "builtin" || kindOf(devs[1].Name) != "wired" {
 		t.Fatalf("tipos: %q %q", kindOf(devs[0].Name), kindOf(devs[1].Name))
 	}
-	bu := []byte(`[{"address":"f3-e3-2f-9b-a2-b4","name":"MONDIAL CM","connected":true,"paired":true},{"address":"aa-bb-cc-dd-ee-ff","name":"","connected":false,"paired":false}]`)
+	bu := []byte(`[{"address":"12-34-56-78-9a-bc","name":"MONDIAL CM","connected":true,"paired":true},{"address":"aa-bb-cc-dd-ee-ff","name":"","connected":false,"paired":false}]`)
 	bt, err := parseBlueutil(bu)
 	if err != nil || len(bt) != 2 || !bt[0].Connected || bt[1].Name != "aa-bb-cc-dd-ee-ff" {
 		t.Fatalf("blueutil: %+v %v", bt, err)

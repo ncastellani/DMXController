@@ -11,7 +11,7 @@
     "key": "default.configured.audio.sink",
     "type": "Spa:String:JSON",
     "value": {
-     "name": "bluez_output.F3_E3_2F_9B_A2_B4.1"
+     "name": "bluez_output.12_34_56_78_9A_BC.1"
     }
    },
    {
@@ -27,7 +27,7 @@
     "key": "default.audio.sink",
     "type": "Spa:String:JSON",
     "value": {
-     "name": "bluez_output.F3_E3_2F_9B_A2_B4.1"
+     "name": "bluez_output.12_34_56_78_9A_BC.1"
     }
    },
    {
@@ -78,7 +78,7 @@
   "info": {
    "props": {
     "media.class": "Audio/Sink",
-    "node.name": "bluez_output.F3_E3_2F_9B_A2_B4.1",
+    "node.name": "bluez_output.12_34_56_78_9A_BC.1",
     "node.description": "MONDIAL CM",
     "device.api": "bluez5"
    }

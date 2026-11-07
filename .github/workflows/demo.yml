@@ -1,0 +1,47 @@
+# Publica o modo demonstração da interface no GitHub Pages: a mesma página do
+# programa, com dados de exemplo e sem servidor (internal/web/static/demo.js).
+#
+# Uma vez só, antes da primeira execução: no repositório, Settings → Pages →
+# Build and deployment → Source: "GitHub Actions".
+name: Demonstração
+
+on:
+  push:
+    branches: [main]
+    paths: ["internal/web/static/**", ".github/workflows/demo.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Monta o site
+        run: |
+          mkdir -p _site
+          cp internal/web/static/index.html internal/web/static/demo.js _site/
+          # <html data-demo>: abre sempre em modo demonstração, sem ?demo=1.
+          sed -i '0,/<html /s//<html data-demo /' _site/index.html
+          grep -q '<html data-demo ' _site/index.html
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v5

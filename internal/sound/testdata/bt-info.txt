@@ -1,4 +1,4 @@
-Device F3:E3:2F:9B:A2:B4 (public)
+Device 12:34:56:78:9A:BC (public)
 	Name: MONDIAL CM
 	Alias: MONDIAL CM
 	Class: 0x00340404 (3408900)
